@@ -15,3 +15,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "boggart"
+
+include(
+    ":boggart-core",
+)
