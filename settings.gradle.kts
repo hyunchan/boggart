@@ -21,4 +21,5 @@ include(
     ":boggart-okhttp",
     ":boggart-ktor",
     ":boggart-android",
+    ":boggart-noop",
 )
