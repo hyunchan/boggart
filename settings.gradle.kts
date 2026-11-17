@@ -19,4 +19,5 @@ rootProject.name = "boggart"
 include(
     ":boggart-core",
     ":boggart-okhttp",
+    ":boggart-ktor",
 )
