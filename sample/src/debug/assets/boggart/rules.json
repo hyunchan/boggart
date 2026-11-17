@@ -1,0 +1,60 @@
+{
+  "rules": [
+    {
+      "id": "todos-empty",
+      "name": "List: empty",
+      "matcher": { "method": "GET", "path": "/todos" },
+      "override": { "type": "replace", "status": 200, "body": "[]" },
+      "enabled": false
+    },
+    {
+      "id": "todos-500",
+      "name": "List: server error 500",
+      "matcher": { "method": "GET", "path": "/todos" },
+      "override": { "type": "replace", "status": 500, "body": "{\"message\":\"Internal Server Error\"}" },
+      "enabled": false
+    },
+    {
+      "id": "todos-broken-json",
+      "name": "List: truncated JSON",
+      "matcher": { "method": "GET", "path": "/todos" },
+      "override": { "type": "replace", "status": 200, "bodyFile": "todos-broken.json" },
+      "enabled": false
+    },
+    {
+      "id": "todos-wrong-type",
+      "name": "List: id as a string",
+      "matcher": { "method": "GET", "path": "/todos" },
+      "override": { "type": "jsonPatch", "ops": [ { "op": "replace", "path": "/0/id", "value": "abc" } ] },
+      "enabled": false
+    },
+    {
+      "id": "todos-title-slow",
+      "name": "List: rename first item, 2 s delay",
+      "matcher": { "method": "GET", "path": "/todos" },
+      "override": { "type": "jsonPatch", "ops": [ { "op": "replace", "path": "/0/title", "value": "Changed by Boggart" } ], "delayMs": 2000 },
+      "enabled": false
+    },
+    {
+      "id": "todo-404",
+      "name": "Detail: 404",
+      "matcher": { "method": "GET", "path": "/todos/*" },
+      "override": { "type": "replace", "status": 404, "body": "{}" },
+      "enabled": false
+    },
+    {
+      "id": "todo-timeout",
+      "name": "Detail: timeout",
+      "matcher": { "method": "GET", "path": "/todos/*" },
+      "override": { "type": "fail", "kind": { "type": "timeout" }, "delayMs": 1000 },
+      "enabled": false
+    },
+    {
+      "id": "todo-complete-500",
+      "name": "Mark as done: server error 500",
+      "matcher": { "method": "PATCH", "path": "/todos/*" },
+      "override": { "type": "replace", "status": 500, "body": "{\"message\":\"Internal Server Error\"}" },
+      "enabled": false
+    }
+  ]
+}

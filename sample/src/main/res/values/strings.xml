@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Boggart Sample</string>
+    <string name="todos_title">To-dos</string>
+    <string name="todo_title">To-do #%1$d</string>
+    <string name="open_boggart">Boggart</string>
+    <string name="back">Back</string>
+    <string name="empty_title">No to-dos</string>
+    <string name="empty_message">New to-dos will appear here.</string>
+    <string name="status_done">Done</string>
+    <string name="status_open">In progress</string>
+    <string name="user_label">User #%1$d</string>
+    <string name="mark_done">Mark as done</string>
+    <string name="marking_done">Sending…</string>
+    <string name="marked_done">Marked as done</string>
+    <string name="mark_done_failed">Couldn\'t mark as done: %1$s</string>
+    <string name="reload">Reload</string>
+    <string name="retry">Try again</string>
+    <string name="server_error_title">Server error (%1$d)</string>
+    <string name="server_error_message">Please try again in a moment.</string>
+    <string name="parse_error_title">Unexpected response format</string>
+    <string name="parse_error_message">The app received a response it can\'t understand.</string>
+    <string name="connection_error_title">Can\'t connect</string>
+    <string name="connection_timeout">The request timed out.</string>
+    <string name="connection_unknown_host">Server not found. Check your network connection.</string>
+    <string name="connection_failed">Couldn\'t connect to the server.</string>
+    <string name="show_cause">Show cause</string>
+    <string name="hide_cause">Hide cause</string>
+    <string name="summary_server_error">server error %1$d</string>
+    <string name="summary_parse_error">response format error</string>
+</resources>

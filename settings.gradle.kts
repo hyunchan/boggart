@@ -22,4 +22,5 @@ include(
     ":boggart-ktor",
     ":boggart-android",
     ":boggart-noop",
+    ":sample",
 )

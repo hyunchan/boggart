@@ -26,6 +26,11 @@ public object BoggartAndroid {
         Config().apply(block)
     }
 
+    /** 설정 블록은 실행하지만 아무것도 바꾸지 않는다. */
+    public fun configure(block: Config.() -> Unit) {
+        Config().apply(block)
+    }
+
     @Suppress("UNUSED_PARAMETER")
     public fun openUi(context: Context): Unit = Unit
 
