@@ -20,4 +20,5 @@ include(
     ":boggart-core",
     ":boggart-okhttp",
     ":boggart-ktor",
+    ":boggart-android",
 )

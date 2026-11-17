@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 공통 -->
+    <string name="boggart_back">뒤로</string>
+    <string name="boggart_mode">모드: %1$s</string>
+    <string name="boggart_mode_title">모드</string>
+    <string name="boggart_mode_active">규칙 적용</string>
+    <string name="boggart_mode_paused">규칙 일시정지</string>
+    <string name="boggart_mode_offline">오프라인</string>
+    <string name="boggart_mode_off">끔</string>
+    <string name="boggart_mode_paused_short">일시정지</string>
+    <string name="boggart_mode_offline_short">오프라인</string>
+    <string name="boggart_mode_active_desc">규칙을 건 호출만 바꿉니다.</string>
+    <string name="boggart_mode_paused_desc">규칙을 지우지 않고 잠시 멈춥니다. 호출은 계속 기록됩니다.</string>
+    <string name="boggart_mode_offline_desc">규칙을 건 호출만 응답하고, 나머지는 네트워크가 없는 것처럼 실패합니다.</string>
+    <string name="boggart_mode_paused_banner">규칙이 일시정지되어 있습니다. 호출은 바뀌지 않고 기록만 됩니다.</string>
+    <string name="boggart_mode_offline_banner">오프라인: 규칙이 없는 호출은 네트워크가 없는 것처럼 실패합니다.</string>
+    <string name="boggart_mode_off_banner">Boggart가 꺼져 있습니다. 호출을 바꾸지도 기록하지도 않습니다.</string>
+    <string name="boggart_cancel">취소</string>
+    <string name="boggart_apply">적용</string>
+    <string name="boggart_save">저장</string>
+    <string name="boggart_remove">지우기</string>
+    <string name="boggart_failed">실패: %1$s</string>
+    <string name="boggart_ignore_invalid">검증에 실패하면 원본 전달</string>
+    <string name="boggart_delay_ms">지연 (ms)</string>
+    <string name="boggart_header_match_notice">헤더 조건 안내: OkHttp는 앱이 직접 넣은 헤더만 매칭됩니다(Content-Type, User-Agent 등 OkHttp가 붙이는 헤더는 없음). Ktor는 플러그인이 붙인 헤더까지 매칭됩니다.</string>
+
+    <!-- 리디큘러스 -->
+    <string name="boggart_riddikulus">리디큘러스!</string>
+    <string name="boggart_ok">확인</string>
+    <string name="boggart_riddikulus_done">리디큘러스! 보가트가 사라졌습니다!</string>
+    <plurals name="boggart_riddikulus_all_message">
+        <item quantity="other">임시 규칙 %d개를 모두 지웁니다. 저장된 규칙과 프리셋은 그대로입니다.</item>
+    </plurals>
+
+    <!-- 호출 목록 -->
+    <string name="boggart_rules_count">규칙 %1$d</string>
+    <string name="boggart_no_calls">아직 캡처된 호출이 없습니다.</string>
+    <plurals name="boggart_call_count">
+        <item quantity="other">%d건</item>
+    </plurals>
+    <string name="boggart_clear_log">기록 지우기</string>
+
+    <!-- 호출 상세 -->
+    <string name="boggart_call_gone">기록에서 사라진 호출입니다.</string>
+    <plurals name="boggart_request_headers_show">
+        <item quantity="other">요청 헤더 %d개 펼치기</item>
+    </plurals>
+    <string name="boggart_request_headers_hide">요청 헤더 접기</string>
+    <string name="boggart_applied_rule">적용된 규칙: %1$s</string>
+    <string name="boggart_response">응답</string>
+    <string name="boggart_response_original">서버 응답</string>
+    <string name="boggart_response_delivered">앱이 받은 응답</string>
+    <string name="boggart_none">없음</string>
+    <plurals name="boggart_response_headers_show">
+        <item quantity="other">응답 헤더 %d개 펼치기</item>
+    </plurals>
+    <string name="boggart_response_headers_hide">응답 헤더 접기</string>
+    <string name="boggart_headers">헤더</string>
+    <string name="boggart_body">바디</string>
+    <string name="boggart_body_not_captured">(캡처하지 않음)</string>
+    <string name="boggart_body_show">바디 펼치기</string>
+    <string name="boggart_body_hide">바디 접기</string>
+    <string name="boggart_body_same_as_tree">위의 응답 트리가 이 바디에 수정을 반영해 보여 줍니다.</string>
+
+    <!-- 규칙 만들기 -->
+    <string name="boggart_create_rule">규칙 만들기</string>
+    <string name="boggart_action_values">빠른 편집</string>
+    <string name="boggart_action_manual">직접 편집</string>
+    <string name="boggart_action_respond">서버 대신 응답</string>
+    <string name="boggart_respond_response">응답 돌려주기</string>
+    <string name="boggart_respond_error">네트워크 에러</string>
+    <string name="boggart_manual_hint">응답 바디를 직접 고치면 실제 응답과 달라진 부분만 규칙이 됩니다(Merge Patch). 배열은 통째로 교체됩니다.</string>
+    <string name="boggart_edit_body">응답 바디 편집</string>
+    <string name="boggart_status_code">상태 코드</string>
+    <string name="boggart_response_headers_field">응답 헤더 (Name: value)</string>
+    <string name="boggart_response_body_field">응답 바디</string>
+    <string name="boggart_create_values">빠른 편집 규칙 만들기</string>
+    <string name="boggart_create_manual">직접 편집 규칙 만들기</string>
+    <string name="boggart_create_response">응답 규칙 만들기</string>
+    <string name="boggart_create_error">에러 규칙 만들기</string>
+    <string name="boggart_rule_applied">규칙을 적용했습니다. 앱에서 다시 불러오면 반영됩니다.</string>
+    <string name="boggart_apply_failed">적용 실패: %1$s</string>
+    <string name="boggart_fail_timeout">타임아웃</string>
+    <string name="boggart_fail_connection_reset">연결 끊김</string>
+    <string name="boggart_fail_unknown_host">호스트 없음</string>
+    <string name="boggart_fail_custom">직접 입력</string>
+    <string name="boggart_exception_message">예외 메시지</string>
+
+    <!-- 규칙을 만들 수 없는 이유 -->
+    <string name="boggart_error_no_original_body">실제 응답 바디가 없어 직접 편집 규칙을 만들 수 없습니다. 서버 대신 응답을 쓰세요.</string>
+    <string name="boggart_error_original_not_json">실제 응답이 JSON이 아니어서 직접 편집 규칙을 만들 수 없습니다. 서버 대신 응답을 쓰세요.</string>
+    <string name="boggart_error_edited_not_json">편집한 내용이 올바른 JSON이 아닙니다. 깨진 바디를 재현하려면 서버 대신 응답을 쓰세요.</string>
+    <string name="boggart_error_no_changes">실제 응답과 달라진 내용이 없습니다.</string>
+    <string name="boggart_error_patch_not_json">패치가 올바른 JSON이 아닙니다.</string>
+    <string name="boggart_error_ops_not_json_patch">JSON Patch 형식이 아닙니다. [{\"op\": \"replace\", \"path\": \"/a\", \"value\": 1}] 꼴로 쓰세요.</string>
+    <string name="boggart_error_no_ops">연산이 없습니다.</string>
+    <string name="boggart_error_no_value_changes">바꾼 값이 없습니다. 트리에서 값을 눌러 고치세요.</string>
+    <string name="boggart_error_values_not_json">실제 응답이 JSON이 아니어서 값을 고칠 수 없습니다. 서버 대신 응답을 쓰세요.</string>
+    <string name="boggart_error_cannot_apply">실제 응답에 적용할 수 없는 변경이 있습니다. 변경 목록을 확인하세요.</string>
+
+    <!-- 빠른 편집 -->
+    <string name="boggart_values_hint">값을 누르면 바꿀 수 있습니다. 객체·배열은 개수 뒤 ⋯로 비우거나 줄이거나 지우거나 바꿉니다.</string>
+    <string name="boggart_values_broken">되돌린 변경 때문에 뒤의 변경을 적용할 수 없습니다. 변경 목록에서 함께 되돌리세요.</string>
+    <string name="boggart_values_tree">응답 트리 (수정 반영)</string>
+    <plurals name="boggart_changes_count">
+        <item quantity="other">변경 %d개</item>
+    </plurals>
+    <string name="boggart_revert">되돌리기</string>
+    <string name="boggart_whole_document">(전체)</string>
+    <string name="boggart_original_value">원래 값: %1$s</string>
+    <string name="boggart_type_text">문자열</string>
+    <string name="boggart_type_number">숫자</string>
+    <string name="boggart_type_bool">참·거짓</string>
+    <string name="boggart_remove_value">이 값 지우기</string>
+    <string name="boggart_op_removed">%1$s 삭제</string>
+    <string name="boggart_op_keep_first">%1$s: 처음 %2$d개만 남김</string>
+
+    <!-- 규칙 목록·편집 -->
+    <string name="boggart_rules_title">규칙</string>
+    <string name="boggart_section_temporary">임시</string>
+    <string name="boggart_section_temporary_hint">화면에서 만든 규칙. 다시 시작하면 사라집니다.</string>
+    <string name="boggart_section_saved">저장됨</string>
+    <string name="boggart_section_saved_hint">앱을 다시 시작해도 유지됩니다.</string>
+    <string name="boggart_section_preset">프리셋</string>
+    <string name="boggart_section_preset_hint">빌드에 실린 규칙. 켜고 끄기만 할 수 있습니다.</string>
+    <string name="boggart_save_failed">저장 실패: %1$s</string>
+    <string name="boggart_override_replace">서버 대신 응답 · %1$d</string>
+    <string name="boggart_override_manual">직접 편집</string>
+    <plurals name="boggart_override_values">
+        <item quantity="other">%d곳 편집</item>
+    </plurals>
+    <string name="boggart_override_fail">서버 대신 응답 · %1$s</string>
+    <string name="boggart_all_requests">모든 요청</string>
+    <string name="boggart_rule_lifted">규칙이 해제되었습니다.</string>
+    <string name="boggart_rule_origin">%1$s 규칙 · %2$s</string>
+    <string name="boggart_enabled">사용</string>
+    <string name="boggart_preset_readonly">프리셋은 편집할 수 없습니다. 호출 화면에서 임시 규칙을 만들어 덮어쓰세요.</string>
+    <string name="boggart_conditions">조건</string>
+    <string name="boggart_method">메서드</string>
+    <string name="boggart_host">호스트</string>
+    <string name="boggart_path_glob">경로 (* 한 세그먼트, ** 여러 세그먼트)</string>
+    <string name="boggart_header_conditions">헤더 조건 (Name: value, 값 * 은 존재만)</string>
+    <string name="boggart_preset_body">프리셋 바디 파일: %1$s (수정하면 인라인 바디로 바뀝니다)</string>
+    <string name="boggart_applied_done">적용했습니다</string>
+    <string name="boggart_saved_done">저장했습니다</string>
+
+    <!-- 규칙 목록 정리 -->
+    <string name="boggart_clear_all">모두 지우기</string>
+    <string name="boggart_more">더보기</string>
+    <string name="boggart_removed_done">지웠습니다</string>
+    <string name="boggart_section_temporary_empty">호출 화면에서 불러낸 보가트(규칙)가 여기에 나옵니다. 앱을 다시 시작하면 사라집니다.</string>
+    <string name="boggart_section_preset_empty">assets/boggart/rules.json에 넣은 규칙이 여기에 나옵니다.</string>
+    <string name="boggart_desc_replace">서버 대신 %1$d 응답</string>
+    <string name="boggart_desc_manual">응답을 직접 편집</string>
+    <plurals name="boggart_desc_values">
+        <item quantity="other">응답 %d곳 편집</item>
+    </plurals>
+    <string name="boggart_desc_fail_timeout">타임아웃으로 실패</string>
+    <string name="boggart_desc_fail_connection_reset">연결 끊김으로 실패</string>
+    <string name="boggart_desc_fail_unknown_host">호스트 없음으로 실패</string>
+    <string name="boggart_desc_fail_custom">“%1$s” 오류로 실패</string>
+    <string name="boggart_desc_delay">%1$dms 지연</string>
+
+    <!-- 호출 상태 (배지 네 가지와 상세 설명) -->
+    <string name="boggart_status_original">원본</string>
+    <string name="boggart_status_changed">조작됨</string>
+    <string name="boggart_status_failed">실패</string>
+    <string name="boggart_status_not_applied">적용 안 됨</string>
+    <string name="boggart_status_desc_original">서버 응답 그대로</string>
+    <string name="boggart_status_desc_network_error">응답을 받기 전에 네트워크 오류가 났습니다</string>
+    <string name="boggart_status_desc_patched">서버 응답 일부를 바꿨습니다</string>
+    <string name="boggart_status_desc_patched_invalid">바꾼 결과가 올바른 JSON이 아닌 채로 전달됐습니다</string>
+    <string name="boggart_status_desc_replaced">서버를 부르지 않고 정한 응답을 전달했습니다</string>
+    <string name="boggart_status_desc_failed_rule">서버를 부르지 않고 규칙으로 실패시켰습니다</string>
+    <string name="boggart_status_desc_offline">오프라인 모드로 막혔습니다</string>
+    <string name="boggart_status_desc_not_applied">규칙이 걸렸지만 결과가 올바르지 않아 원본을 전달했습니다</string>
+    <string name="boggart_request_body_show">요청 바디 펼치기</string>
+    <string name="boggart_request_body_hide">요청 바디 접기</string>
+    <string name="boggart_action_values_desc">서버 응답 중 고른 부분만 바꿉니다.</string>
+    <string name="boggart_action_respond_desc">서버를 부르지 않고 정한 응답을 돌려주거나 네트워크 에러를 냅니다. 서버 응답의 일부만 바꾸려면 빠른 편집을 쓰세요.</string>
+    <string name="boggart_values_no_server_response">서버를 부르지 않은 호출이라 고칠 서버 응답이 없습니다. 응답을 바꾸려면 서버 대신 응답을 쓰세요.</string>
+
+    <!-- 호출 상세: 배열 항목 안내·지연 -->
+    <string name="boggart_values_array_note">배열 항목이라 위치로 지정합니다. 응답의 순서가 바뀌면 다른 항목에 적용됩니다.</string>
+    <string name="boggart_delay">지연</string>
+    <string name="boggart_delay_none">없음</string>
+    <string name="boggart_delay_1s">1초</string>
+    <string name="boggart_delay_3s">3초</string>
+    <string name="boggart_delay_custom">입력</string>
+    <string name="boggart_rule_shadowed">가려짐: “%1$s” 규칙이 먼저 적용됩니다</string>
+    <plurals name="boggart_matching_rules">
+        <item quantity="other">이 호출에 맞는 켜진 규칙이 %d개입니다. 먼저 오는 하나만 적용됩니다.</item>
+    </plurals>
+    <string name="boggart_update_rule">규칙 고치기</string>
+    <string name="boggart_switch_to_values">빠른 편집으로 바꾸기</string>
+    <string name="boggart_switch_to_manual">직접 편집으로 바꾸기</string>
+    <string name="boggart_switch_to_response">응답으로 바꾸기</string>
+    <string name="boggart_switch_to_error">네트워크 에러로 바꾸기</string>
+    <string name="boggart_rule_updated">규칙을 고쳤습니다. 앱에서 다시 불러오면 반영됩니다.</string>
+    <string name="boggart_copy_url">URL 복사</string>
+    <string name="boggart_copy_body">응답 바디 복사</string>
+    <string name="boggart_copy_curl">cURL로 복사</string>
+    <string name="boggart_copied">복사했습니다</string>
+    <!-- 코드 필드 미리보기·전체 화면 편집 -->
+    <string name="boggart_tap_to_edit">눌러서 편집</string>
+    <string name="boggart_tap_to_view">눌러서 전체 보기</string>
+    <plurals name="boggart_lines">
+        <item quantity="other">%d줄</item>
+    </plurals>
+    <string name="boggart_done">완료</string>
+    <string name="boggart_close">닫기</string>
+    <string name="boggart_empty">(비어 있음)</string>
+    <string name="boggart_delay_none_long">지연 없음</string>
+    <string name="boggart_delay_seconds">지연 %1$s초</string>
+    <string name="boggart_guide">안내</string>
+    <string name="boggart_request">요청</string>
+    <!-- 규칙으로 만들지 않은 수정이 있을 때 나가기 확인 -->
+    <string name="boggart_discard_title">수정한 내용을 버릴까요?</string>
+    <string name="boggart_discard_message">고친 내용으로 아직 규칙을 만들지 않았습니다. 지금 나가면 사라집니다.</string>
+    <string name="boggart_discard">나가기</string>
+    <string name="boggart_keep_editing">계속 편집</string>
+    <!-- 빠른 편집: 배열 -->
+    <string name="boggart_array_clear">빈 배열로</string>
+    <string name="boggart_array_keep_first">처음 몇 개만 남기기</string>
+    <string name="boggart_array_remove_item">이 항목 지우기</string>
+    <string name="boggart_replace_with_value">다른 값으로 바꾸기</string>
+    <string name="boggart_array_keep_count">남길 개수</string>
+    <plurals name="boggart_array_size_now">
+        <item quantity="other">지금 %d개가 있습니다.</item>
+    </plurals>
+    <string name="boggart_array_keep_note">항목은 위치로 지웁니다. 나중 응답이 더 짧으면 규칙을 적용할 수 없어 원본이 전달됩니다.</string>
+</resources>

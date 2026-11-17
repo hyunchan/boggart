@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 기본(영어) 문구. 영국식 철자·표현을 쓴다. 한국어는 values-ko. -->
+<resources>
+    <string name="boggart_app_name" translatable="false">Boggart</string>
+
+    <!-- 공통 -->
+    <string name="boggart_back">Back</string>
+    <string name="boggart_mode">Mode: %1$s</string>
+    <string name="boggart_mode_title">Mode</string>
+    <string name="boggart_mode_active">Rules on</string>
+    <string name="boggart_mode_paused">Rules paused</string>
+    <string name="boggart_mode_offline">Offline</string>
+    <string name="boggart_mode_off">Off</string>
+    <!-- 버블 아래 짧은 모드 표시 -->
+    <string name="boggart_mode_paused_short">Paused</string>
+    <string name="boggart_mode_offline_short">Offline</string>
+    <string name="boggart_mode_active_desc">Changes only the calls you\'ve set rules for.</string>
+    <string name="boggart_mode_paused_desc">Stops the rules without deleting them. Calls are still recorded.</string>
+    <string name="boggart_mode_offline_desc">Only calls with a rule get a response. The rest fail as if there were no network.</string>
+    <string name="boggart_mode_paused_banner">Rules are paused. Calls go through unchanged and are only recorded.</string>
+    <string name="boggart_mode_offline_banner">Offline: calls without a rule fail as if there were no network.</string>
+    <string name="boggart_mode_off_banner">Boggart is off. Calls are neither changed nor recorded.</string>
+    <string name="boggart_cancel">Cancel</string>
+    <string name="boggart_apply">Apply</string>
+    <string name="boggart_save">Save</string>
+    <string name="boggart_remove">Remove</string>
+    <string name="boggart_failed">Failed: %1$s</string>
+    <string name="boggart_ignore_invalid">Pass the original on if validation fails</string>
+    <string name="boggart_delay_ms">Delay (ms)</string>
+    <string name="boggart_header_match_notice">Header conditions: OkHttp matches only headers the app sets itself, not Content-Type, User-Agent and the others OkHttp adds. Ktor also matches headers added by plugins.</string>
+
+    <!-- 리디큘러스 -->
+    <string name="boggart_riddikulus">Riddikulus!</string>
+    <string name="boggart_ok">OK</string>
+    <string name="boggart_riddikulus_done">Riddikulus! The boggart is gone!</string>
+    <plurals name="boggart_riddikulus_all_message">
+        <item quantity="one">This clears the temporary rule. Saved rules and presets stay as they are.</item>
+        <item quantity="other">This clears all %d temporary rules. Saved rules and presets stay as they are.</item>
+    </plurals>
+
+    <!-- 호출 목록 -->
+    <string name="boggart_rules_count">Rules %1$d</string>
+    <string name="boggart_no_calls">No calls captured yet.</string>
+    <plurals name="boggart_call_count">
+        <item quantity="one">%d call</item>
+        <item quantity="other">%d calls</item>
+    </plurals>
+    <string name="boggart_clear_log">Clear log</string>
+
+    <!-- 호출 상세 -->
+    <string name="boggart_call_gone">This call is no longer in the log.</string>
+    <plurals name="boggart_request_headers_show">
+        <item quantity="one">Show 1 request header</item>
+        <item quantity="other">Show %d request headers</item>
+    </plurals>
+    <string name="boggart_request_headers_hide">Hide request headers</string>
+    <string name="boggart_applied_rule">Applied rule: %1$s</string>
+    <string name="boggart_response">Response</string>
+    <string name="boggart_response_original">Server response</string>
+    <string name="boggart_response_delivered">What the app got</string>
+    <string name="boggart_none">None</string>
+    <plurals name="boggart_response_headers_show">
+        <item quantity="one">Show 1 response header</item>
+        <item quantity="other">Show %d response headers</item>
+    </plurals>
+    <string name="boggart_response_headers_hide">Hide response headers</string>
+    <string name="boggart_headers">Headers</string>
+    <string name="boggart_body">Body</string>
+    <string name="boggart_body_not_captured">(not captured)</string>
+    <string name="boggart_body_show">Show body</string>
+    <string name="boggart_body_hide">Hide body</string>
+    <string name="boggart_body_same_as_tree">The response tree above shows this body with your edits applied.</string>
+
+    <!-- 규칙 만들기 -->
+    <string name="boggart_create_rule">Create a rule</string>
+    <string name="boggart_action_values">Quick edit</string>
+    <string name="boggart_action_manual">Manual edit</string>
+    <string name="boggart_action_respond">Stub response</string>
+    <string name="boggart_respond_response">Return a response</string>
+    <string name="boggart_respond_error">Network error</string>
+    <string name="boggart_manual_hint">Edit the response body by hand and only what differs from the real response becomes the rule (a Merge Patch). Arrays are replaced as a whole.</string>
+    <string name="boggart_edit_body">Edit response body</string>
+    <string name="boggart_status_code">Status code</string>
+    <string name="boggart_response_headers_field">Response headers (Name: value)</string>
+    <string name="boggart_response_body_field">Response body</string>
+    <string name="boggart_create_values">Create quick edit rule</string>
+    <string name="boggart_create_manual">Create manual edit rule</string>
+    <string name="boggart_create_response">Create response rule</string>
+    <string name="boggart_create_error">Create error rule</string>
+    <string name="boggart_rule_applied">Rule applied. Reload in the app to see it.</string>
+    <string name="boggart_apply_failed">Couldn\'t apply: %1$s</string>
+    <string name="boggart_fail_timeout">Timeout</string>
+    <string name="boggart_fail_connection_reset">Connection reset</string>
+    <string name="boggart_fail_unknown_host">Unknown host</string>
+    <string name="boggart_fail_custom">Custom</string>
+    <string name="boggart_exception_message">Exception message</string>
+
+    <!-- 규칙을 만들 수 없는 이유 -->
+    <string name="boggart_error_no_original_body">There is no real response body to edit. Use Stub response instead.</string>
+    <string name="boggart_error_original_not_json">The real response isn\'t JSON, so it can\'t be edited here. Use Stub response instead.</string>
+    <string name="boggart_error_edited_not_json">The edited text isn\'t valid JSON. To reproduce a broken body, use Stub response.</string>
+    <string name="boggart_error_no_changes">Nothing differs from the real response.</string>
+    <string name="boggart_error_patch_not_json">The patch isn\'t valid JSON.</string>
+    <string name="boggart_error_ops_not_json_patch">This isn\'t a JSON Patch. Write it as [{\"op\": \"replace\", \"path\": \"/a\", \"value\": 1}].</string>
+    <string name="boggart_error_no_ops">There are no operations.</string>
+    <string name="boggart_error_no_value_changes">No values have changed. Tap a value in the tree to edit it.</string>
+    <string name="boggart_error_values_not_json">The real response isn\'t JSON, so its values can\'t be edited. Use Stub response instead.</string>
+    <string name="boggart_error_cannot_apply">Some changes can\'t be applied to the real response. Check the list of changes.</string>
+
+    <!-- 빠른 편집 -->
+    <string name="boggart_values_hint">Tap a value to change it. Use ⋯ after an object or array count to empty, trim, remove or replace it.</string>
+    <string name="boggart_values_broken">A change you reverted leaves later changes unable to apply. Revert those as well.</string>
+    <string name="boggart_values_tree">Response tree (with edits)</string>
+    <plurals name="boggart_changes_count">
+        <item quantity="one">1 change</item>
+        <item quantity="other">%d changes</item>
+    </plurals>
+    <string name="boggart_revert">Revert</string>
+    <string name="boggart_whole_document">(whole document)</string>
+    <string name="boggart_original_value">Original value: %1$s</string>
+    <string name="boggart_type_text">Text</string>
+    <string name="boggart_type_number">Number</string>
+    <string name="boggart_type_bool">True/false</string>
+    <string name="boggart_type_null" translatable="false">null</string>
+    <string name="boggart_type_raw" translatable="false">JSON</string>
+    <string name="boggart_remove_value">Remove this value</string>
+    <string name="boggart_op_removed">%1$s removed</string>
+    <string name="boggart_op_keep_first">%1$s: keep the first %2$d</string>
+
+    <!-- 규칙 목록·편집 -->
+    <string name="boggart_rules_title">Rules</string>
+    <string name="boggart_section_temporary">Temporary</string>
+    <string name="boggart_section_temporary_hint">Made on screen. Gone after a restart.</string>
+    <string name="boggart_section_saved">Saved</string>
+    <string name="boggart_section_saved_hint">Kept across app restarts.</string>
+    <string name="boggart_section_preset">Presets</string>
+    <string name="boggart_section_preset_hint">Rules bundled with the build. You can only switch them on or off.</string>
+    <string name="boggart_save_failed">Couldn\'t save: %1$s</string>
+    <string name="boggart_override_replace">Stub response · %1$d</string>
+    <string name="boggart_override_manual">Manual edit</string>
+    <plurals name="boggart_override_values">
+        <item quantity="one">1 edit</item>
+        <item quantity="other">%d edits</item>
+    </plurals>
+    <string name="boggart_override_fail">Stub response · %1$s</string>
+    <string name="boggart_all_requests">All requests</string>
+    <string name="boggart_rule_lifted">This rule has been cleared.</string>
+    <string name="boggart_rule_origin">%1$s rule · %2$s</string>
+    <string name="boggart_enabled">Enabled</string>
+    <string name="boggart_preset_readonly">Presets can\'t be edited. Create a temporary rule from the call screen to override one.</string>
+    <string name="boggart_conditions">Conditions</string>
+    <string name="boggart_method">Method</string>
+    <string name="boggart_host">Host</string>
+    <string name="boggart_path_glob">Path (* one segment, ** any number)</string>
+    <string name="boggart_header_conditions">Header conditions (Name: value, * checks presence only)</string>
+    <string name="boggart_preset_body">Preset body file: %1$s (editing it switches to an inline body)</string>
+    <string name="boggart_applied_done">Applied</string>
+    <string name="boggart_saved_done">Saved</string>
+
+    <!-- 규칙 목록 정리 -->
+    <string name="boggart_clear_all">Clear all</string>
+    <string name="boggart_more">More options</string>
+    <string name="boggart_removed_done">Removed</string>
+    <string name="boggart_section_temporary_empty">Boggarts (rules) you summon from a call appear here. They\'re gone when the app restarts.</string>
+    <string name="boggart_section_preset_empty">Rules in assets/boggart/rules.json appear here.</string>
+    <string name="boggart_desc_replace">Responds with %1$d instead of the server</string>
+    <string name="boggart_desc_manual">Edits the response by hand</string>
+    <plurals name="boggart_desc_values">
+        <item quantity="one">1 edit to the response</item>
+        <item quantity="other">%d edits to the response</item>
+    </plurals>
+    <string name="boggart_desc_fail_timeout">Fails with a timeout</string>
+    <string name="boggart_desc_fail_connection_reset">Fails with a connection reset</string>
+    <string name="boggart_desc_fail_unknown_host">Fails as if the host were unknown</string>
+    <string name="boggart_desc_fail_custom">Fails with “%1$s”</string>
+    <string name="boggart_desc_delay">%1$d ms delay</string>
+
+    <!-- 호출 상태 (배지 네 가지와 상세 설명) -->
+    <string name="boggart_status_original">Original</string>
+    <string name="boggart_status_changed">Changed</string>
+    <string name="boggart_status_failed">Failed</string>
+    <string name="boggart_status_not_applied">Not applied</string>
+    <string name="boggart_status_desc_original">Straight from the server</string>
+    <string name="boggart_status_desc_network_error">A network error occurred before any response</string>
+    <string name="boggart_status_desc_patched">Part of the server response was changed</string>
+    <string name="boggart_status_desc_patched_invalid">Changed and passed on even though it isn\'t valid JSON</string>
+    <string name="boggart_status_desc_replaced">Answered without calling the server</string>
+    <string name="boggart_status_desc_failed_rule">Failed by a rule without calling the server</string>
+    <string name="boggart_status_desc_offline">Blocked by offline mode</string>
+    <string name="boggart_status_desc_not_applied">A rule matched, but its result was invalid, so the original was passed on</string>
+    <string name="boggart_request_body_show">Show request body</string>
+    <string name="boggart_request_body_hide">Hide request body</string>
+    <string name="boggart_action_values_desc">Changes only the parts you pick in the server response.</string>
+    <string name="boggart_action_respond_desc">Doesn\'t call the server: returns the response you set, or raises a network error. To change only part of the server response, use Quick edit.</string>
+    <string name="boggart_values_no_server_response">This call never reached the server, so there\'s no server response to edit. Use Stub response to change the response.</string>
+
+    <!-- 호출 상세: 배열 항목 안내·지연 -->
+    <string name="boggart_values_array_note">This is an array item, addressed by its position. If the order of the response changes, the edit lands on a different item.</string>
+    <string name="boggart_delay">Delay</string>
+    <string name="boggart_delay_none">None</string>
+    <string name="boggart_delay_1s">1 s</string>
+    <string name="boggart_delay_3s">3 s</string>
+    <string name="boggart_delay_custom">Custom</string>
+    <string name="boggart_rule_shadowed">Shadowed: “%1$s” applies first</string>
+    <plurals name="boggart_matching_rules">
+        <item quantity="one">%d enabled rule matches this call.</item>
+        <item quantity="other">%d enabled rules match this call. Only the first one applies.</item>
+    </plurals>
+    <string name="boggart_update_rule">Update rule</string>
+    <string name="boggart_switch_to_values">Switch to quick edit</string>
+    <string name="boggart_switch_to_manual">Switch to manual edit</string>
+    <string name="boggart_switch_to_response">Switch to response</string>
+    <string name="boggart_switch_to_error">Switch to network error</string>
+    <string name="boggart_rule_updated">Rule updated. Reload in the app to see it.</string>
+    <string name="boggart_copy_url">Copy URL</string>
+    <string name="boggart_copy_body">Copy response body</string>
+    <string name="boggart_copy_curl">Copy as cURL</string>
+    <string name="boggart_copied">Copied</string>
+    <!-- 코드 필드 미리보기·전체 화면 편집 -->
+    <string name="boggart_tap_to_edit">Tap to edit</string>
+    <string name="boggart_tap_to_view">Tap to view all</string>
+    <plurals name="boggart_lines">
+        <item quantity="one">1 line</item>
+        <item quantity="other">%d lines</item>
+    </plurals>
+    <string name="boggart_done">Done</string>
+    <string name="boggart_close">Close</string>
+    <string name="boggart_empty">(empty)</string>
+    <string name="boggart_delay_none_long">No delay</string>
+    <string name="boggart_delay_seconds">%1$s s delay</string>
+    <string name="boggart_guide">How it works</string>
+    <string name="boggart_request">Request</string>
+    <!-- 규칙으로 만들지 않은 수정이 있을 때 나가기 확인 -->
+    <string name="boggart_discard_title">Discard your changes?</string>
+    <string name="boggart_discard_message">You haven\'t made a rule from your edits. If you leave now, they\'ll be lost.</string>
+    <string name="boggart_discard">Leave</string>
+    <string name="boggart_keep_editing">Keep editing</string>
+    <!-- 빠른 편집: 배열 -->
+    <string name="boggart_array_clear">Make it an empty array</string>
+    <string name="boggart_array_keep_first">Keep only the first few</string>
+    <string name="boggart_array_remove_item">Remove this item</string>
+    <string name="boggart_replace_with_value">Replace with another value</string>
+    <string name="boggart_array_keep_count">Items to keep</string>
+    <plurals name="boggart_array_size_now">
+        <item quantity="one">It has 1 item now.</item>
+        <item quantity="other">It has %d items now.</item>
+    </plurals>
+    <string name="boggart_array_keep_note">Items are removed by position. If a later response is shorter, the rule can\'t apply and the original is passed on.</string>
+</resources>
