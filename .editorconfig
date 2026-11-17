@@ -1,0 +1,66 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+ktlint_code_style = android_studio
+indent_size = 4
+indent_style = space
+max_line_length = 120
+
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# 다중 조건 when 엔트리의 단독 줄 "->" 들여쓰기. IDE 기본값(true, 조건보다 +4)은
+# ktlint indent 룰(조건과 동일 들여쓰기)과 충돌해 재포맷 왕복을 일으킨다.
+ij_kotlin_indent_before_arrow_on_new_line = false
+
+# Import 정렬
+ij_kotlin_name_count_to_use_star_import = 999
+ij_kotlin_name_count_to_use_star_import_for_members = 999
+ij_kotlin_imports_layout = *, java.**, javax.**, kotlin.**, ^
+
+# Wrapping
+ij_kotlin_keep_line_breaks = true
+ij_kotlin_wrap_expression_body_functions = 1
+
+# ktlint 규칙
+ktlint_standard_annotation = disabled
+ktlint_standard_blank-line-between-when-conditions = disabled
+ktlint_standard_no-wildcard-imports = enabled
+ktlint_standard_trailing-comma-on-declaration-site = enabled
+ktlint_standard_function-naming = enabled
+ktlint_standard_max-line-length = disabled
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# Compose 린트: CompositionLocal은 암묵 의존이라 기본으로 막는다.
+# 조립 지점(BoggartActivity)이 화면에 저장소를 내려 주는 LocalBoggartStore만 허용한다.
+compose_allowed_composition_locals = LocalBoggartStore
+
+# 포맷팅 규칙 조정 (과도한 줄바꿈 방지, IDE 포맷과 왕복 충돌 방지)
+ktlint_standard_filename = disabled
+ktlint_standard_function-expression-body = disabled
+ktlint_standard_function-signature = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_chain-method-continuation = disabled
+ktlint_standard_parameter-list-wrapping = disabled
+
+# Markdown 문서 — fenced code 블록 자동 reformat 비활성화
+[*.md]
+ij_markdown_format_code_fragments = false
+ij_markdown_format_code_blocks = false
+
+# XML — 개발자별 IDE 기본값 차이로 인한 들여쓰기 변동 방지
+[*.xml]
+indent_size = 4
+indent_style = space
+continuation_indent_size = 8
+ij_xml_attribute_wrap = normal
+ij_xml_align_attributes = false
+ij_xml_space_inside_empty_tag = true
+ij_xml_keep_line_breaks = true
+ij_xml_keep_indents_on_empty_lines = false
