@@ -25,8 +25,10 @@ jobs:
         run: ./gradlew check :sample:assembleRelease -PVERSION_NAME="${GITHUB_REF_NAME#v}"
 
       # 서명 플러그인이 구성 캐시와 맞지 않아 발행 단계에서만 끈다.
+      # 업로드까지만 하고, Central 포털의 Deployments에서 확인한 뒤 Publish를 누른다.
+      # 공개된 버전은 지울 수 없으므로 첫 배포 결과를 확인한 뒤 publishAndReleaseToMavenCentral로 바꾼다.
       - name: Publish
-        run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache -PVERSION_NAME="${GITHUB_REF_NAME#v}"
+        run: ./gradlew publishToMavenCentral --no-configuration-cache -PVERSION_NAME="${GITHUB_REF_NAME#v}"
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
