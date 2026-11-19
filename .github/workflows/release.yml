@@ -12,23 +12,22 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Check
         run: ./gradlew check :sample:assembleRelease -PVERSION_NAME="${GITHUB_REF_NAME#v}"
 
       # 서명 플러그인이 구성 캐시와 맞지 않아 발행 단계에서만 끈다.
-      # 업로드까지만 하고, Central 포털의 Deployments에서 확인한 뒤 Publish를 누른다.
-      # 공개된 버전은 지울 수 없으므로 첫 배포 결과를 확인한 뒤 publishAndReleaseToMavenCentral로 바꾼다.
+      # 업로드 후 Central 검증을 통과하면 바로 공개한다. 공개된 버전은 지울 수 없다.
       - name: Publish
-        run: ./gradlew publishToMavenCentral --no-configuration-cache -PVERSION_NAME="${GITHUB_REF_NAME#v}"
+        run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache -PVERSION_NAME="${GITHUB_REF_NAME#v}"
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
