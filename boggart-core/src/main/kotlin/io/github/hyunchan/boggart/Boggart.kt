@@ -4,7 +4,8 @@ package io.github.hyunchan.boggart
  * Boggart 전역 진입점. 어댑터는 [engine]을, UI는 [temporaryRules]·[exchangeLog]·[mode]를 사용한다.
  */
 public object Boggart {
-    public const val VERSION: String = "0.1.0"
+    /** 발행 버전. 빌드가 `VERSION_NAME`에서 생성한다. */
+    public const val VERSION: String = BOGGART_VERSION
 
     /** 임시 규칙. 항상 [RuleSource.PRIORITY_TEMPORARY]로 최우선 매칭된다. */
     public val temporaryRules: TemporaryRuleSource = TemporaryRuleSource()

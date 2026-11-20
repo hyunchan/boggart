@@ -25,6 +25,11 @@ class BoggartTest {
     }
 
     @Test
+    fun `version comes from the build`() {
+        assertTrue(Regex("""\d+\.\d+\.\d+(-SNAPSHOT)?""").matches(Boggart.VERSION), Boggart.VERSION)
+    }
+
+    @Test
     fun `riddikulus removes all temporary rules`() = runTest {
         Boggart.temporaryRules.add(rule("a", "/users/*"))
         Boggart.temporaryRules.add(rule("b", "/posts"))

@@ -4,9 +4,23 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Boggart.VERSION을 발행 버전(VERSION_NAME, 릴리스는 태그 버전)에서 만든다. 손으로 고치다 낡는 일을 막는다.
+val generateVersion by tasks.registering {
+    val version = providers.gradleProperty("VERSION_NAME")
+    val outputDir = layout.buildDirectory.dir("generated/boggartVersion")
+    inputs.property("version", version)
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().file("io/github/hyunchan/boggart/BoggartVersion.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText("package io.github.hyunchan.boggart\n\ninternal const val BOGGART_VERSION: String = \"${version.get()}\"\n")
+    }
+}
+
 kotlin {
     jvmToolchain(21)
     explicitApi()
+    sourceSets.main { kotlin.srcDir(generateVersion) }
 }
 
 dependencies {
