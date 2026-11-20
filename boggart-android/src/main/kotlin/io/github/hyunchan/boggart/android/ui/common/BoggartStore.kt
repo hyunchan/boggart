@@ -184,6 +184,9 @@ internal sealed interface UiEffect {
     /** 화면을 닫는다(규칙을 지운 뒤 등). */
     data object Close : UiEffect
 
+    /** 화면을 닫고 [message]를 알린다. 닫히는 화면의 스낵바는 보이지 않으므로 토스트로 알린다. */
+    data class CloseWith(val message: UiMessage) : UiEffect
+
     /** Boggart 화면을 모두 닫고 앱으로 돌아간다. 앱 위에는 스낵바를 띄울 수 없어 [message]는 토스트로 알린다. */
     data class ReturnToApp(val message: UiMessage) : UiEffect
 }

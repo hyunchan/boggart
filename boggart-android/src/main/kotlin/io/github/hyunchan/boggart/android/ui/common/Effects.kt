@@ -27,6 +27,10 @@ internal fun CollectEffects(
             when (effect) {
                 is UiEffect.Message -> snackbar.showSnackbar(effect.message.format(resources))
                 UiEffect.Close -> close()
+                is UiEffect.CloseWith -> {
+                    Toast.makeText(context, effect.message.format(resources), Toast.LENGTH_SHORT).show()
+                    close()
+                }
                 is UiEffect.ReturnToApp -> {
                     // 화면이 곧 닫히므로 앱 위에서도 보이는 토스트로 알린다.
                     Toast.makeText(context, effect.message.format(resources), Toast.LENGTH_LONG).show()

@@ -161,6 +161,8 @@
     <string name="boggart_clear_all">Clear all</string>
     <string name="boggart_more">More options</string>
     <string name="boggart_removed_done">Removed</string>
+    <string name="boggart_remove_saved_title">Remove saved rule?</string>
+    <string name="boggart_remove_saved_message">%1$s will be removed. Saved rules stay after the app restarts, so this can\'t be undone.</string>
     <string name="boggart_section_temporary_empty">Boggarts (rules) you summon from a call appear here. They\'re gone when the app restarts.</string>
     <string name="boggart_section_preset_empty">Rules in assets/boggart/rules.json appear here.</string>
     <string name="boggart_desc_replace">Responds with %1$d instead of the server</string>

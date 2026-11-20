@@ -7,6 +7,7 @@ import io.github.hyunchan.boggart.android.ui.common.MainDispatcherExtension
 import io.github.hyunchan.boggart.android.ui.common.RuleOrigin
 import io.github.hyunchan.boggart.android.ui.common.RuleTarget
 import io.github.hyunchan.boggart.android.ui.common.UiEffect
+import io.github.hyunchan.boggart.android.ui.common.UiMessage
 import io.github.hyunchan.boggart.android.ui.common.rule
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -49,12 +50,18 @@ class RuleEditViewModelTest {
     }
 
     @Test
-    fun `removing closes the screen`() = runTest {
+    fun `removing closes the screen with the same message as the list`() = runTest {
         val store = FakeBoggartStore()
         store.upsert(RuleTarget.Temporary("t"), rule("t"))
-        val vm = RuleEditViewModel("t", store)
-        vm.onIntent(RuleEditIntent.Remove)
-        assertEquals(UiEffect.Close, vm.effects.first())
+        store.upsert(RuleTarget.Saved("s"), rule("s"))
+        val temporary = RuleEditViewModel("t", store)
+        temporary.onIntent(RuleEditIntent.Remove)
+        assertEquals(UiEffect.CloseWith(UiMessage(R.string.boggart_riddikulus_done)), temporary.effects.first())
         assertTrue(store.currentRules().temporary.isEmpty())
+
+        val saved = RuleEditViewModel("s", store)
+        saved.onIntent(RuleEditIntent.Remove)
+        assertEquals(UiEffect.CloseWith(UiMessage(R.string.boggart_removed_done)), saved.effects.first())
+        assertTrue(store.currentRules().saved.orEmpty().isEmpty())
     }
 }

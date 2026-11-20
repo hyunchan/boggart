@@ -149,6 +149,8 @@
     <string name="boggart_clear_all">모두 지우기</string>
     <string name="boggart_more">더보기</string>
     <string name="boggart_removed_done">지웠습니다</string>
+    <string name="boggart_remove_saved_title">저장된 규칙을 지울까요?</string>
+    <string name="boggart_remove_saved_message">%1$s 규칙을 지웁니다. 앱을 다시 시작해도 남던 규칙이라 되돌릴 수 없습니다.</string>
     <string name="boggart_section_temporary_empty">호출 화면에서 불러낸 보가트(규칙)가 여기에 나옵니다. 앱을 다시 시작하면 사라집니다.</string>
     <string name="boggart_section_preset_empty">assets/boggart/rules.json에 넣은 규칙이 여기에 나옵니다.</string>
     <string name="boggart_desc_replace">서버 대신 %1$d 응답</string>

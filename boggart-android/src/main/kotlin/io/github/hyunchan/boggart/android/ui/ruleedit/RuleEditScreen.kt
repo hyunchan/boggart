@@ -2,6 +2,7 @@
 
 package io.github.hyunchan.boggart.android.ui.ruleedit
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -10,9 +11,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -21,11 +29,14 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -80,6 +91,12 @@ internal fun RuleEditContent(
                 scrollBehavior = scrollBehavior,
                 title = { Text(found?.second?.name ?: stringResource(R.string.boggart_rules_title)) },
                 navigationIcon = { BackButton(onBack) },
+                actions = {
+                    // 프리셋은 파일에서 오므로 지울 수 없다(켜고 끄기만).
+                    if (found != null && found.first != RuleOrigin.Preset) {
+                        RemoveMenu(found.first, found.second.name) { onIntent(RuleEditIntent.Remove) }
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -171,14 +188,45 @@ private fun ColumnScope.RuleFormFields(origin: RuleOrigin, rule: Rule, form: Rul
             RuleOrigin.Temporary -> {
                 OutlinedButton(onClick = { onIntent(RuleEditIntent.Apply) }) { Text(stringResource(R.string.boggart_apply)) }
                 Button(onClick = { onIntent(RuleEditIntent.Save) }, enabled = canSave) { Text(stringResource(R.string.boggart_save)) }
-                OutlinedButton(onClick = { onIntent(RuleEditIntent.Remove) }) { Text(stringResource(R.string.boggart_remove)) }
             }
-            RuleOrigin.Saved -> {
-                Button(onClick = { onIntent(RuleEditIntent.Save) }) { Text(stringResource(R.string.boggart_save)) }
-                OutlinedButton(onClick = { onIntent(RuleEditIntent.Remove) }) { Text(stringResource(R.string.boggart_remove)) }
-            }
+            RuleOrigin.Saved -> Button(onClick = { onIntent(RuleEditIntent.Save) }) { Text(stringResource(R.string.boggart_save)) }
             RuleOrigin.Preset -> Unit
         }
+    }
+}
+
+/**
+ * 상단 바의 ⋮ 메뉴. 목록의 규칙 메뉴와 같은 자리·이름으로 지우기를 둔다.
+ * 저장된 규칙은 앱을 다시 시작해도 남는 규칙이라 한 번 더 묻고, 임시 규칙은 목록처럼 바로 지운다.
+ */
+@Composable
+private fun RemoveMenu(origin: RuleOrigin, ruleName: String, onRemove: () -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { menuOpen = true }) {
+            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.boggart_more))
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.boggart_remove)) }, onClick = {
+                menuOpen = false
+                if (origin == RuleOrigin.Saved) confirm = true else onRemove()
+            })
+        }
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(stringResource(R.string.boggart_remove_saved_title)) },
+            text = { Text(stringResource(R.string.boggart_remove_saved_message, ruleName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    onRemove()
+                }) { Text(stringResource(R.string.boggart_remove)) }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.boggart_cancel)) } },
+        )
     }
 }
 

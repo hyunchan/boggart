@@ -99,10 +99,13 @@ internal sealed interface RuleEditIntent {
 
 internal class RuleEditViewModel(private val ruleId: String, private val store: BoggartStore) : ViewModel() {
     private val form = MutableStateFlow<RuleForm?>(null)
+
+    // 지우는 중에는 마지막 모습을 그대로 둔다. 그러지 않으면 화면이 닫히는 동안 "해제된 규칙"으로 다시 그려진다.
+    private val closing = MutableStateFlow<RuleEditState?>(null)
     private val effectChannel = Channel<UiEffect>(Channel.BUFFERED)
     val effects: Flow<UiEffect> = effectChannel.receiveAsFlow()
 
-    val state: StateFlow<RuleEditState> = combine(store.rules, form) { rules, f -> RuleEditState.of(rules, ruleId, f) }
+    val state: StateFlow<RuleEditState> = combine(store.rules, form, closing) { rules, f, last -> last ?: RuleEditState.of(rules, ruleId, f) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, RuleEditState.of(store.currentRules(), ruleId, null))
 
     init {
@@ -136,8 +139,11 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
                 if (origin == RuleOrigin.Temporary) store.promote(it) else store.upsert(RuleTarget.Saved(it.id), it)
             }
             RuleEditIntent.Remove -> viewModelScope.launch {
+                closing.value = state.value
                 store.remove(origin, rule.id)
-                effectChannel.send(UiEffect.Close)
+                // 목록에서 지울 때와 같은 문구로 알린다.
+                val done = if (origin == RuleOrigin.Temporary) R.string.boggart_riddikulus_done else R.string.boggart_removed_done
+                effectChannel.send(UiEffect.CloseWith(UiMessage(done)))
             }
             is RuleEditIntent.SetPresetEnabled -> viewModelScope.launch { store.setEnabled(origin, rule, intent.enabled) }
         }
