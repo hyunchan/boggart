@@ -1,6 +1,6 @@
 ---
 name: release
-description: Boggart를 Maven Central에 배포한다. 버전 결정 → CI 확인 → 태그 push(자동 공개) → 공개 확인 → README 의존성 버전·개발 버전 올림까지. 사용자가 "배포", "릴리스", "태그 달고 버전 올려" 등을 요청할 때 쓴다.
+description: Boggart를 Maven Central에 배포한다. 버전 결정 → CI 확인 → 태그 push(자동 공개) → 공개 확인 → README 의존성 버전·개발 버전 올림 → GitHub 릴리스 노트까지. 사용자가 "배포", "릴리스", "태그 달고 버전 올려" 등을 요청할 때 쓴다.
 ---
 
 # Boggart 배포 절차
@@ -52,6 +52,8 @@ curl -s -o /dev/null -w '%{http_code}\n' https://repo1.maven.org/maven2/io/githu
 
 ## 5. 배포 후 버전 올림 (커밋 두 개)
 
+두 커밋은 서로 영향이 없어 순서는 상관없다.
+
 1. README 의존성 버전: 두 README의 설치 예시(`boggart-android`·`boggart-okhttp`·`boggart-ktor`·`boggart-noop`)를 새 버전으로 바꾼다.
    - 커밋: `chore : README 의존성 버전을 <버전>으로 올린다`
 2. 개발 버전: `gradle.properties`의 `VERSION_NAME`을 다음 패치 SNAPSHOT(`0.2.0` → `0.2.1-SNAPSHOT`)으로 바꾼다.
@@ -59,6 +61,19 @@ curl -s -o /dev/null -w '%{http_code}\n' https://repo1.maven.org/maven2/io/githu
 
 본문은 bullet 목록, 끝에 대화의 attribution 줄을 붙인다. 두 커밋을 push한다.
 
-## 6. 기록
+## 6. GitHub 릴리스 노트
 
-`docs-local/`이 있으면 `DESIGN.md` 구현 이력에 배포 버전과 날짜를 남긴다. 사용자에게 공개 버전, 태그, 워크플로 결과, 올린 버전을 보고한다.
+Maven Central에는 변경 내역을 실을 곳이 없으므로 태그마다 GitHub Release를 게시한다.
+
+- 초안은 README 기본 언어(영국식 영어)로 쓰고, 문안 전문을 사용자에게 승인받은 뒤 게시한다.
+- 담을 것: 새 기능(README 섹션 링크), **업그레이드하면 동작이 바뀌는 점**(기본으로 켜지는 기능과 끄는 방법), 사용자가 겪던 버그 수정, 의존성 한 줄. 같은 릴리스 안에서 개발 중에 고친 것(새 기능의 미공개 결함, 린트·빌드 정리)은 사용자가 겪을 일이 없으므로 뺀다.
+- 링크는 절대 주소(`https://github.com/hyunchan/boggart#섹션`)로 쓴다. 릴리스 노트의 상대 링크는 릴리스 페이지 기준으로 해석돼 깨진다.
+
+```bash
+gh release create v<버전> --title "v<버전>" --notes-file <노트 파일> --verify-tag
+gh release view v<버전> --json name,tagName,isDraft,url
+```
+
+## 7. 기록
+
+`docs-local/`이 있으면 `DESIGN.md` 구현 이력에 배포 버전과 날짜를 남긴다. 사용자에게 공개 버전, 태그, 워크플로 결과, 올린 버전, 릴리스 노트 주소를 보고한다.
