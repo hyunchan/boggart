@@ -18,6 +18,20 @@ internal object ControlTarget {
         return segments to query
     }
 
+    /** 경로 세그먼트·쿼리 값으로 쓸 수 있게 비예약 문자(RFC 3986) 밖의 바이트를 모두 %XX로 바꾼다. */
+    fun encode(text: String): String = buildString {
+        for (byte in text.toByteArray(Charsets.UTF_8)) {
+            val c = byte.toInt() and 0xFF
+            if ((c < 0x80 && c.toChar().isLetterOrDigit()) || c.toChar() in "-._~") {
+                append(c.toChar())
+            } else {
+                append('%').append(HEX[c shr 4]).append(HEX[c and 0x0F])
+            }
+        }
+    }
+
+    private const val HEX = "0123456789ABCDEF"
+
     fun decode(text: String, plusIsSpace: Boolean): String {
         if ('%' !in text && !(plusIsSpace && '+' in text)) return text
         // 인코딩되지 않은 글자는 UTF-8 바이트로 두고, %XX는 바이트 하나로 바꾼 뒤 한 번에 UTF-8로 읽는다.

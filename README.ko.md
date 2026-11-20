@@ -272,6 +272,18 @@ curl -X POST localhost:8765/reset
 
 `/calls/wait`에는 `since`를 넘겨야 기다리기 전에 이미 나간 호출을 놓치지 않습니다. 실패하면 2xx가 아닌 상태와 `{"error": {"code", "message"}}`를 돌려줍니다. 원격 제어를 끄려면 `remoteControl = false`로 둡니다([설정](#설정) 참고).
 
+### AI 에이전트에서 쓰기 (MCP)
+
+같은 소켓의 `/mcp`는 [MCP](https://modelcontextprotocol.io)로도 응답합니다. 에이전트는 명령을 입력 형식이 정해진 도구로 받고, 규칙은 전체 스키마까지 받습니다. `adb forward` 뒤 한 번 등록합니다. Claude Code라면:
+
+```bash
+claude mcp add --transport http boggart http://localhost:8765/mcp
+```
+
+Streamable HTTP 서버를 지원하는 다른 클라이언트도 같은 주소를 씁니다. 도구는 `boggart_status`, `boggart_set_mode`, `boggart_reset`, `boggart_list_calls`, `boggart_get_call`, `boggart_wait_for_call`, `boggart_list_rules`, `boggart_put_rule`, `boggart_set_rule_enabled`, `boggart_delete_rule`, `boggart_import_rules`입니다. 서버가 세션을 두지 않으므로 forward가 살아 있는 한 앱이 재시작돼도 그대로 동작합니다. 기기를 다시 연결했다면 `adb forward`를 다시 실행합니다.
+
+**curl과 MCP 중 고르기.** 셸 명령을 실행할 수 있는 에이전트(Claude Code 등)나 테스트 스크립트라면 위의 curl 명령만으로 모든 기능을 쓸 수 있습니다. MCP는 셸이 없는 클라이언트에서 쓰거나, 규칙 스키마로 입력을 검증받고 싶을 때 유용합니다. 도구 정의는 규칙 스키마를 포함해 약 15KB이고, 클라이언트에 따라 이 정의가 세션 컨텍스트에 계속 실릴 수 있습니다.
+
 ## 설정
 
 Boggart는 아래 기본값으로 시작합니다. 바꾸려면 `Application`에서 `BoggartAndroid.configure`를 부릅니다. 적지 않은 항목은 기본값 그대로입니다.

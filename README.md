@@ -272,6 +272,18 @@ curl -X POST localhost:8765/reset
 
 Pass `since` to `/calls/wait` so that a call made before the wait starts isn't missed. Failures return a non-2xx status with `{"error": {"code", "message"}}`. To turn remote control off, set `remoteControl = false` (see [Configuration](#configuration)).
 
+### Using it from an AI agent (MCP)
+
+The same socket also speaks [MCP](https://modelcontextprotocol.io) at `/mcp`, so agents get the commands as tools with typed inputs, including a full schema for rules. After `adb forward`, register it once. For Claude Code:
+
+```bash
+claude mcp add --transport http boggart http://localhost:8765/mcp
+```
+
+Other clients that support Streamable HTTP servers take the same URL. The tools are `boggart_status`, `boggart_set_mode`, `boggart_reset`, `boggart_list_calls`, `boggart_get_call`, `boggart_wait_for_call`, `boggart_list_rules`, `boggart_put_rule`, `boggart_set_rule_enabled`, `boggart_delete_rule` and `boggart_import_rules`. The server keeps no session, so it keeps working after the app restarts as long as the forward is in place. Run `adb forward` again after reconnecting the device.
+
+**Choosing between curl and MCP.** Agents that can run shell commands (such as Claude Code) and test scripts can use every feature with the curl commands above. MCP is useful in clients without a shell, or when you want inputs checked against the rule schema. The tool definitions, rule schema included, come to about 15 KB, and depending on the client they may stay in the session's context throughout.
+
 ## Configuration
 
 Boggart starts with the defaults below. To change them, call `BoggartAndroid.configure` in your `Application`. Settings you leave out keep their defaults.

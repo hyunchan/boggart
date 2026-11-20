@@ -11,6 +11,7 @@ import io.github.hyunchan.boggart.android.control.PresetControlStore
 import io.github.hyunchan.boggart.android.control.SavedControlStore
 import io.github.hyunchan.boggart.android.overlay.OverlayController
 import io.github.hyunchan.boggart.control.BoggartControl
+import io.github.hyunchan.boggart.control.BoggartMcp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -201,9 +202,9 @@ public object BoggartAndroid {
             presetRules = { presetRules?.let(::PresetControlStore) },
             info = { mapOf("packageName" to packageName, "socket" to "localabstract:$socketName") },
         )
-        val server = ControlServer(socketName, control) { message, error -> Log.w(TAG, message, error) }
+        val server = ControlServer(socketName, control, BoggartMcp(control)) { message, error -> Log.w(TAG, message, error) }
         if (!server.start()) return null
-        Log.i(TAG, "Remote control: adb forward tcp:8765 localabstract:$socketName && curl localhost:8765/")
+        Log.i(TAG, "Remote control: adb forward tcp:8765 localabstract:$socketName && curl localhost:8765/ (MCP: http://localhost:8765/mcp)")
         return server
     }
 

@@ -66,6 +66,7 @@ public class BoggartControl(
             "GET",
             "/status",
             "Mode, rule counts per source, and the id of the latest captured call (use it as 'since').",
+            tool = ControlTool("boggart_status"),
         ) { status() },
         ControlCommand("mode.get", "GET", "/mode", "Current mode.") { modeJson() },
         ControlCommand(
@@ -75,6 +76,11 @@ public class BoggartControl(
             "Change the mode. active: apply rules. paused: capture only, rules ignored. " +
                 "offline: calls without a rule fail with UnknownHost. off: bypass Boggart entirely (nothing captured).",
             body = """{"mode": "active" | "paused" | "offline" | "off"}""",
+            tool = ControlTool(
+                "boggart_set_mode",
+                bodyProperties = mapOf("mode" to RuleSchema.enumOf(Mode.entries.map(::modeName), "The new mode.")),
+                requiredBody = listOf("mode"),
+            ),
         ) { setMode(it) },
         ControlCommand(
             "reset",
@@ -82,6 +88,7 @@ public class BoggartControl(
             "/reset",
             "Start a clean test: remove every temporary rule, clear captured calls, and set the mode to active. " +
                 "Saved rules and preset toggles stay.",
+            tool = ControlTool("boggart_reset"),
         ) { reset() },
         ControlCommand(
             "calls.list",
@@ -89,9 +96,10 @@ public class BoggartControl(
             "/calls",
             "Captured calls, oldest first, without bodies. 'lastId' is the newest id in the log.",
             params = CALL_FILTERS + listOf(
-                ControlParam("since", "query", "Only calls with an id greater than this."),
-                ControlParam("limit", "query", "Return at most this many of the newest matches. Default $DEFAULT_LIMIT."),
+                ControlParam("since", "query", "Only calls with an id greater than this.", type = "integer"),
+                ControlParam("limit", "query", "Return at most this many of the newest matches. Default $DEFAULT_LIMIT.", type = "integer"),
             ),
+            tool = ControlTool("boggart_list_calls"),
         ) { listCalls(it) },
         ControlCommand(
             "calls.wait",
@@ -100,9 +108,20 @@ public class BoggartControl(
             "Block until a call matching the filters is captured, then return it with bodies. " +
                 "Read 'lastId' from /status before triggering the app, and pass it as 'since' so a fast call isn't missed.",
             params = CALL_FILTERS + listOf(
-                ControlParam("since", "query", "Only calls with an id greater than this. Default: the newest id when the wait starts."),
-                ControlParam("timeoutMs", "query", "Give up after this long with 408 TIMEOUT. Default $DEFAULT_WAIT_MS, max $MAX_WAIT_MS."),
+                ControlParam(
+                    "since",
+                    "query",
+                    "Only calls with an id greater than this. Default: the newest id when the wait starts.",
+                    type = "integer",
+                ),
+                ControlParam(
+                    "timeoutMs",
+                    "query",
+                    "Give up after this long with 408 TIMEOUT. Default $DEFAULT_WAIT_MS, max $MAX_WAIT_MS.",
+                    type = "integer",
+                ),
             ),
+            tool = ControlTool("boggart_wait_for_call"),
         ) { waitCall(it) },
         ControlCommand(
             "calls.get",
@@ -110,7 +129,8 @@ public class BoggartControl(
             "/calls/{id}",
             "One captured call with request, server response (originalResponse) and the response the app received (deliveredResponse). " +
                 "Each body is {size, mediaType, json | text | base64}.",
-            params = listOf(ControlParam("id", "path", "Call id.", required = true)),
+            params = listOf(ControlParam("id", "path", "Call id.", required = true, type = "integer")),
+            tool = ControlTool("boggart_get_call"),
         ) { getCall(it) },
         ControlCommand("calls.clear", "DELETE", "/calls", "Clear captured calls.") {
             log.clear()
@@ -122,6 +142,7 @@ public class BoggartControl(
             "/rules",
             "Rules in the order the engine tries them. Only the first enabled rule that matches a call applies.",
             params = listOf(SOURCE_PARAM),
+            tool = ControlTool("boggart_list_rules"),
         ) { listRules(it) },
         ControlCommand(
             "rules.get",
@@ -138,9 +159,19 @@ public class BoggartControl(
                 "anything else becomes a temporary rule.",
             params = listOf(
                 ID_PARAM,
-                ControlParam("target", "query", "temporary (in memory, cleared by reset) or saved (kept across restarts)."),
+                ControlParam(
+                    "target",
+                    "query",
+                    "temporary (in memory, cleared by reset) or saved (kept across restarts).",
+                    enum = listOf(TEMPORARY, SAVED),
+                ),
             ),
             body = RULE_BODY,
+            tool = ControlTool(
+                "boggart_put_rule",
+                bodyProperties = mapOf("rule" to RuleSchema.rule(withId = false)),
+                requiredBody = listOf("rule"),
+            ) { it.getValue("rule") },
         ) { putRule(it) },
         ControlCommand(
             "rules.update",
@@ -149,6 +180,11 @@ public class BoggartControl(
             "Turn a rule on or off. Works for preset rules too.",
             params = listOf(ID_PARAM, SOURCE_PARAM),
             body = """{"enabled": true | false}""",
+            tool = ControlTool(
+                "boggart_set_rule_enabled",
+                bodyProperties = mapOf("enabled" to RuleSchema.boolean("true turns the rule on, false turns it off.")),
+                requiredBody = listOf("enabled"),
+            ),
         ) { updateRule(it) },
         ControlCommand(
             "rules.delete",
@@ -156,6 +192,7 @@ public class BoggartControl(
             "/rules/{id}",
             "Delete a temporary or saved rule. Preset rules can't be deleted; turn them off instead.",
             params = listOf(ID_PARAM, SOURCE_PARAM),
+            tool = ControlTool("boggart_delete_rule"),
         ) { deleteRule(it) },
         ControlCommand(
             "rules.import",
@@ -163,17 +200,27 @@ public class BoggartControl(
             "/rules/import",
             "Apply many rules at once, e.g. a test scenario. Rules with an existing id in the target are replaced.",
             params = listOf(
-                ControlParam("target", "query", "temporary (default) or saved."),
-                ControlParam("replace", "query", "true removes every rule in the target first."),
+                ControlParam("target", "query", "temporary (default) or saved.", enum = listOf(TEMPORARY, SAVED)),
+                ControlParam("replace", "query", "true removes every rule in the target first.", type = "boolean"),
             ),
             body = """{"version": 1, "rules": [<rule>, ...]} — the same format as assets/boggart/rules.json""",
+            tool = ControlTool(
+                "boggart_import_rules",
+                bodyProperties = mapOf("rules" to RuleSchema.rules()),
+                requiredBody = listOf("rules"),
+            ) { args ->
+                buildJsonObject {
+                    put("version", RulesDocument.CURRENT_VERSION)
+                    put("rules", args.getValue("rules"))
+                }
+            },
         ) { importRules(it) },
         ControlCommand(
             "rules.clear",
             "DELETE",
             "/rules",
             "Remove every rule in one editable source.",
-            params = listOf(ControlParam("source", "query", "temporary or saved.", required = true)),
+            params = listOf(ControlParam("source", "query", "temporary or saved.", required = true, enum = listOf(TEMPORARY, SAVED))),
         ) { clearRules(it) },
     )
 
@@ -226,6 +273,7 @@ public class BoggartControl(
         put("service", "boggart")
         put("version", Boggart.VERSION)
         put("errors", "Failures return {\"error\": {\"code\", \"message\"}} with a non-2xx status.")
+        put("mcp", "POST /mcp speaks MCP (Streamable HTTP, tools only) with the commands that have a 'tool' name.")
         putJsonArray("commands") {
             for (command in commands) {
                 add(
@@ -249,6 +297,7 @@ public class BoggartControl(
                             }
                         }
                         command.body?.let { put("body", it) }
+                        command.tool?.let { put("tool", it.name) }
                     },
                 )
             }
@@ -524,7 +573,7 @@ public class BoggartControl(
         const val MAX_WAIT_MS = 120_000L
 
         val ID_PARAM = ControlParam("id", "path", "Rule id.", required = true)
-        val SOURCE_PARAM = ControlParam("source", "query", "Limit to one source: temporary, saved, preset, or other.")
+        val SOURCE_PARAM = ControlParam("source", "query", "Limit to one source: temporary, saved, preset, or other.", enum = ORIGINS)
         val CALL_FILTERS = listOf(
             ControlParam("method", "query", "HTTP method, e.g. GET."),
             ControlParam("host", "query", "Exact host."),

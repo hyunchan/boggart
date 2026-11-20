@@ -1,6 +1,7 @@
 package io.github.hyunchan.boggart.android.control
 
 import io.github.hyunchan.boggart.control.BoggartControl
+import io.github.hyunchan.boggart.control.BoggartMcp
 import io.github.hyunchan.boggart.control.ControlRequest
 import io.github.hyunchan.boggart.control.ControlResponse
 import kotlinx.coroutines.runBlocking
@@ -24,15 +25,35 @@ internal object ControlHttp {
 
     class HttpError(val status: Int, val code: String, message: String) : IOException(message)
 
-    /** [input]에서 요청 하나를 읽어 [control]로 처리하고 [output]에 응답을 쓴다. */
-    fun serve(input: InputStream, output: OutputStream, control: BoggartControl) {
+    const val MCP_PATH = "/mcp"
+
+    /** [input]에서 요청 하나를 읽어 [control]로 처리하고 [output]에 응답을 쓴다. `/mcp`는 [mcp]가 JSON-RPC로 처리한다. */
+    fun serve(input: InputStream, output: OutputStream, control: BoggartControl, mcp: BoggartMcp? = null) {
         val response = try {
             val request = read(input, output)
+            if (mcp != null && request.target.substringBefore('?') == MCP_PATH) {
+                serveMcp(request, output, mcp)
+                return
+            }
             runBlocking { control.handle(ControlRequest(request.method, request.target, request.body)) }
         } catch (e: HttpError) {
             error(e.status, e.code, e.message.orEmpty())
         }
         write(output, response)
+    }
+
+    /**
+     * Streamable HTTP의 POST만 지원한다. 서버가 먼저 보낼 메시지가 없어 GET(SSE 스트림)은 405,
+     * 응답이 필요 없는 알림·응답은 202로 받는다.
+     */
+    private fun serveMcp(request: Request, output: OutputStream, mcp: BoggartMcp) {
+        if (request.method != "POST") {
+            write(output, error(405, "METHOD_NOT_ALLOWED", "Use POST for $MCP_PATH."), extraHeaders = "Allow: POST\r\n")
+            return
+        }
+        val body = request.body ?: throw HttpError(400, "BAD_REQUEST", "$MCP_PATH needs a JSON-RPC message body")
+        val reply = runBlocking { mcp.handle(body) }
+        if (reply == null) writeRaw(output, 202, ByteArray(0)) else writeRaw(output, 200, (reply + "\n").toByteArray(Charsets.UTF_8))
     }
 
     fun read(input: InputStream, output: OutputStream): Request {
@@ -58,11 +79,15 @@ internal object ControlHttp {
         return Request(parts[0], parts[1], headers, body)
     }
 
-    fun write(output: OutputStream, response: ControlResponse) {
-        val body = (response.bodyText() + "\n").toByteArray(Charsets.UTF_8)
-        val head = "HTTP/1.1 ${response.status} ${reason(response.status)}\r\n" +
-            "Content-Type: application/json; charset=utf-8\r\n" +
+    fun write(output: OutputStream, response: ControlResponse, extraHeaders: String = "") {
+        writeRaw(output, response.status, (response.bodyText() + "\n").toByteArray(Charsets.UTF_8), extraHeaders)
+    }
+
+    private fun writeRaw(output: OutputStream, status: Int, body: ByteArray, extraHeaders: String = "") {
+        val head = "HTTP/1.1 $status ${reason(status)}\r\n" +
+            (if (body.isNotEmpty()) "Content-Type: application/json; charset=utf-8\r\n" else "") +
             "Content-Length: ${body.size}\r\n" +
+            extraHeaders +
             "Connection: close\r\n\r\n"
         output.write(head.toByteArray(Charsets.US_ASCII))
         output.write(body)
@@ -126,6 +151,7 @@ internal object ControlHttp {
 
     private fun reason(status: Int) = when (status) {
         200 -> "OK"
+        202 -> "Accepted"
         400 -> "Bad Request"
         403 -> "Forbidden"
         404 -> "Not Found"

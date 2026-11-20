@@ -51,9 +51,10 @@ public interface ControlRuleStore {
 /**
  * 명령 하나의 정의. REST 라우팅과 도움말(`GET /`)이 이 정의에서 만들어진다.
  *
- * @property name 안정된 명령 이름(`rules.put`). 나중에 MCP 도구 이름으로도 쓴다.
+ * @property name 안정된 명령 이름(`rules.put`).
  * @property path 경로 패턴. `{id}`처럼 중괄호 세그먼트는 경로 파라미터다.
  * @property body 바디 설명. 바디를 받지 않으면 null.
+ * @property tool MCP 도구로 노출할 때의 정의. null이면 MCP에 노출하지 않는다.
  */
 public class ControlCommand internal constructor(
     public val name: String,
@@ -62,17 +63,36 @@ public class ControlCommand internal constructor(
     public val summary: String,
     public val params: List<ControlParam> = emptyList(),
     public val body: String? = null,
+    public val tool: ControlTool? = null,
     internal val handler: suspend (ControlCall) -> JsonObject,
 ) {
     internal val segments: List<String> = path.split('/').filter { it.isNotEmpty() }
 }
 
-/** 명령 파라미터. [location]은 `path` 또는 `query`. */
+/**
+ * 명령 파라미터. [location]은 `path` 또는 `query`, [type]은 JSON Schema 타입(`string`·`integer`·`boolean`)이다.
+ * 전송은 늘 문자열이지만 MCP 도구 입력 스키마가 [type]과 [enum]을 쓴다.
+ */
 public class ControlParam internal constructor(
     public val name: String,
     public val location: String,
     public val description: String,
     public val required: Boolean = false,
+    public val type: String = "string",
+    public val enum: List<String>? = null,
+)
+
+/**
+ * 명령을 MCP 도구로 노출하는 정의. 입력은 명령의 경로·쿼리 파라미터에 [bodyProperties]를 더한 객체 하나다.
+ *
+ * @property bodyProperties 바디로 보낼 입력. 이름 → JSON Schema.
+ * @property toBody 도구 입력에서 요청 바디를 만든다. 기본은 [bodyProperties]에 해당하는 입력만 모은 객체.
+ */
+public class ControlTool internal constructor(
+    public val name: String,
+    public val bodyProperties: Map<String, JsonObject> = emptyMap(),
+    public val requiredBody: List<String> = emptyList(),
+    internal val toBody: ((JsonObject) -> JsonElement)? = null,
 )
 
 /** 핸들러가 받는 해석된 요청. */

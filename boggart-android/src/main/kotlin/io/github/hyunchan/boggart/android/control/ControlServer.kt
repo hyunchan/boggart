@@ -5,6 +5,7 @@ import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.os.Process
 import io.github.hyunchan.boggart.control.BoggartControl
+import io.github.hyunchan.boggart.control.BoggartMcp
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -15,6 +16,7 @@ import java.util.concurrent.Executors
  * ```
  * adb forward tcp:8765 localabstract:boggart-<applicationId>
  * curl localhost:8765/status
+ * claude mcp add --transport http boggart http://localhost:8765/mcp
  * ```
  *
  * 다른 앱도 같은 이름의 소켓에 연결할 수 있으므로 상대 uid가 shell·root·이 앱일 때만 받는다.
@@ -22,6 +24,7 @@ import java.util.concurrent.Executors
 internal class ControlServer(
     val socketName: String,
     private val control: BoggartControl,
+    private val mcp: BoggartMcp,
     private val logger: (String, Throwable?) -> Unit,
 ) {
     @Volatile
@@ -85,7 +88,7 @@ internal class ControlServer(
                     return
                 }
                 client.soTimeout = READ_TIMEOUT_MS
-                ControlHttp.serve(client.inputStream, client.outputStream, control)
+                ControlHttp.serve(client.inputStream, client.outputStream, control, mcp)
             } catch (e: IOException) {
                 logger("Remote control request failed", e)
             }
