@@ -74,8 +74,12 @@ public object BoggartAndroid {
     @Volatile
     private var installation: Installation? = null
 
+    /**
+     * [configure]가 다시 설치할 때 쓰는 앱. 프로세스와 수명이 같은 Application만 보관한다.
+     * 타입을 Context로 두면 Activity가 들어올 수 있다고 보고 린트가 StaticFieldLeak로 경고한다.
+     */
     @Volatile
-    private var installedContext: Context? = null
+    private var installedApp: Application? = null
 
     /**
      * 설치된 Boggart의 설정을 바꾼다. 자동 설치 뒤 `Application.onCreate()`에서 부르면 된다.
@@ -84,7 +88,7 @@ public object BoggartAndroid {
      * @throws IllegalStateException 자동 설치를 끄고 아직 [install]을 부르지 않았을 때
      */
     public fun configure(block: Config.() -> Unit) {
-        val context = checkNotNull(installedContext) {
+        val context = checkNotNull(installedApp) {
             "Boggart isn't installed. Automatic installation is turned off, so call BoggartAndroid.install(context) instead."
         }
         install(context, block)
@@ -108,7 +112,7 @@ public object BoggartAndroid {
      */
     public fun install(context: Context, block: Config.() -> Unit = {}) {
         val app = context.applicationContext
-        installedContext = app
+        installedApp = app as? Application
         val config = Config().apply(block)
         install(
             openAsset = { path ->
