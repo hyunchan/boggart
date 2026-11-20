@@ -63,10 +63,10 @@ Boggart는 Maven Central에 있습니다. debug에는 실제 구현을, release�
 
 ```kotlin
 dependencies {
-    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.1.0")
-    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.1.0") // OkHttp·Retrofit을 쓰면
-    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.1.0")   // Ktor를 쓰면
-    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.1.0")
+    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.1.1")
+    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.1.1") // OkHttp·Retrofit을 쓰면
+    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.1.1")   // Ktor를 쓰면
+    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.1.1")
 }
 ```
 
