@@ -64,10 +64,10 @@ Boggart is on Maven Central. Use the real implementation in debug builds and the
 
 ```kotlin
 dependencies {
-    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.1.1")
-    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.1.1") // if you use OkHttp or Retrofit
-    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.1.1")   // if you use Ktor
-    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.1.1")
+    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.2.0")
+    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.2.0") // if you use OkHttp or Retrofit
+    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.2.0")   // if you use Ktor
+    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.2.0")
 }
 ```
 
