@@ -14,6 +14,7 @@ startup = "1.2.0"
 retrofit = "3.0.0"
 mavenPublish = "0.37.0"
 ktlint = "14.2.0"
+ktlintEngine = "1.8.0"
 ktlintComposeRules = "0.6.6"
 
 compileSdk = "36"

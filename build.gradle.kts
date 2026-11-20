@@ -92,6 +92,7 @@ subprojects {
     val isAndroid = path in setOf(":boggart-android", ":boggart-noop", ":sample")
 
     extensions.configure<KtlintExtension> {
+        version.set(rootProject.libs.versions.ktlintEngine)
         android.set(isAndroid)
         outputToConsole.set(true)
         filter {
