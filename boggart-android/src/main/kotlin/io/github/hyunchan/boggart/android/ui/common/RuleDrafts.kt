@@ -181,9 +181,8 @@ internal object RuleDrafts {
 
     fun editFail(rule: Rule, kind: FailKind, delayMs: Long): Rule = rule.copy(override = Override.Fail(kind, delayMs))
 
-    /** 빈 칸은 조건 없음(null). */
     /**
-     * 조건을 고친다. 이름이 조건으로 만든 기본 이름 그대로면 새 조건에 맞춰 이름도 바꾼다.
+     * 조건을 고친다. 빈 칸은 조건 없음(null)이다. 이름이 조건으로 만든 기본 이름 그대로면 새 조건에 맞춰 이름도 바꾼다.
      * 프리셋처럼 사람이 붙인 이름은 건드리지 않는다.
      */
     fun editMatcher(rule: Rule, method: String, host: String, path: String, headersText: String): Rule {

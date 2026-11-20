@@ -118,11 +118,8 @@ public object BoggartAndroid {
     public val savedRules: SavedRuleSource? get() = installation?.savedRules
 
     /**
-     * 설치한다. 동기 반환하며 파일 로딩은 내부 IO 스코프에서 시작한다([awaitLoaded]로 대기).
-     * 다시 호출하면 이전 설치의 소스와 로딩을 교체한다. [context]는 applicationContext만 보관한다.
-     */
-    /**
      * 설치한다. 자동 설치를 쓰면 부를 필요가 없다. 다시 부르면 이전 설치를 새 설정으로 바꾼다.
+     * 동기 반환하며 파일 로딩은 내부 IO 스코프에서 시작한다([awaitLoaded]로 대기). [context]는 applicationContext만 보관한다.
      */
     public fun install(context: Context, block: Config.() -> Unit = {}) {
         val app = context.applicationContext
