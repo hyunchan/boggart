@@ -55,6 +55,23 @@ class ControlHttpTest {
     }
 
     @Test
+    fun `requests from web pages are refused before running`() {
+        val body = """{"mode":"paused"}"""
+        val fromPage = exchange("PUT /mode HTTP/1.1\r\nHost: localhost:8765\r\nOrigin: https://example.com\r\nContent-Length: ${body.length}\r\n\r\n$body")
+        assertEquals(403, status(fromPage))
+        val rebound = exchange("PUT /mode HTTP/1.1\r\nHost: attacker.example:8765\r\nContent-Length: ${body.length}\r\n\r\n$body")
+        assertEquals(403, status(rebound))
+        assertEquals("{\"mode\":\"active\"}\n", exchange("GET /mode HTTP/1.1\r\n\r\n").substringAfter("\r\n\r\n"))
+    }
+
+    @Test
+    fun `loopback hosts are accepted`() {
+        for (host in listOf("localhost", "localhost:8765", "127.0.0.1:8765", "[::1]:8765", "LOCALHOST")) {
+            assertEquals(200, status(exchange("GET /mode HTTP/1.1\r\nHost: $host\r\n\r\n")), host)
+        }
+    }
+
+    @Test
     fun `truncated requests are bad requests`() {
         assertEquals(400, status(exchange("GET /mode HTTP/1.1\r\n")))
         assertEquals(400, status(exchange("PUT /mode HTTP/1.1\r\nContent-Length: 10\r\n\r\n{}")))

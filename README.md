@@ -239,7 +239,7 @@ curl localhost:8765/            # every command with its parameters
 curl localhost:8765/status
 ```
 
-The exact `adb forward` line is also printed to logcat under the `Boggart` tag. Only adb shell and the app itself can connect; other apps on the device are refused.
+The exact `adb forward` line is also printed to logcat under the `Boggart` tag. Only adb shell and the app itself can connect; other apps on the device are refused. Requests from web pages open on your computer are refused too.
 
 | Command | What it does |
 |---|---|

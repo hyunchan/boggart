@@ -44,6 +44,7 @@ internal object ControlHttp {
             val colon = line.indexOf(':').takeIf { it > 0 } ?: throw HttpError(400, "BAD_REQUEST", "Malformed header line")
             line.substring(0, colon).trim().lowercase() to line.substring(colon + 1).trim()
         }
+        checkNotFromBrowser(headers)
         if (headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true) {
             throw HttpError(411, "BAD_REQUEST", "Chunked bodies aren't supported; send Content-Length (curl --data-binary @file does).")
         }
@@ -77,6 +78,22 @@ internal object ControlHttp {
             }
         },
     )
+
+    /**
+     * `adb forward`로 열린 `localhost` 포트에는 개발자 PC 브라우저의 웹 페이지도 요청을 보낼 수 있다.
+     * 브라우저는 교차 출처 요청에 늘 `Origin`을 붙이므로 그런 요청을 막고, DNS 리바인딩을 막으려고 `Host`는 루프백 이름만 받는다.
+     * curl과 MCP 클라이언트는 `Origin`을 보내지 않는다.
+     */
+    private fun checkNotFromBrowser(headers: Map<String, String>) {
+        if ("origin" in headers) throw HttpError(403, "FORBIDDEN", "Requests from web pages (with an Origin header) are refused")
+        val host = headers["host"] ?: return
+        val name = if (host.startsWith('[')) host.substringBefore(']') + "]" else host.substringBefore(':')
+        if (name.lowercase() !in LOOPBACK_HOSTS) {
+            throw HttpError(403, "FORBIDDEN", "Host '$host' is refused; connect to localhost through adb forward")
+        }
+    }
+
+    private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]")
 
     private fun readHead(input: InputStream): String {
         val buffer = ByteArrayOutputStream()

@@ -239,7 +239,7 @@ curl localhost:8765/            # 모든 명령과 파라미터
 curl localhost:8765/status
 ```
 
-정확한 `adb forward` 명령은 logcat의 `Boggart` 태그에도 찍힙니다. adb shell과 앱 자신만 연결할 수 있고, 기기의 다른 앱은 거절합니다.
+정확한 `adb forward` 명령은 logcat의 `Boggart` 태그에도 찍힙니다. adb shell과 앱 자신만 연결할 수 있고, 기기의 다른 앱은 거절합니다. 컴퓨터에 열린 웹 페이지가 보내는 요청도 거절합니다.
 
 | 명령 | 하는 일 |
 |---|---|
