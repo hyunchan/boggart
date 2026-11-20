@@ -18,6 +18,7 @@ public object BoggartAndroid {
         public var mode: Mode? = null
         public var overlay: Boolean = true
         public var overlayWindowMs: Long = 2_000
+        public var remoteControl: Boolean = true
     }
 
     /** 설정 블록은 실행하지만 아무것도 등록하지 않는다. */

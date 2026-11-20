@@ -40,6 +40,7 @@ A boggart is a creature from British folklore; in Harry Potter it takes the shap
 - [Managing rules](#managing-rules)
 - [QA recipes](#qa-recipes)
 - [Presets: shipping scenarios with the build](#presets-shipping-scenarios-with-the-build)
+- [Controlling Boggart from the command line](#controlling-boggart-from-the-command-line)
 - [Configuration](#configuration)
 - [Release builds](#release-builds)
 - [Sample app](#sample-app)
@@ -226,6 +227,51 @@ A preset with `"enabled": true` is on for everyone who installs the build, so ke
 
 Presets and saved rules apply from the app's very first request. Boggart reads them when the app starts, and a request made before they're ready waits for them, for up to 0.5 seconds.
 
+## Controlling Boggart from the command line
+
+Everything the screens do can also be done over adb, without touching the UI. Each command takes and returns JSON, so AI agents and test scripts can drive Boggart directly: check which calls the app made, add or change rules, switch presets on and off, and change the mode.
+
+Boggart opens a local socket when the debug app starts. Forward it to your computer once per device, then use `curl`:
+
+```bash
+adb forward tcp:8765 localabstract:boggart-<applicationId>
+curl localhost:8765/            # every command with its parameters
+curl localhost:8765/status
+```
+
+The exact `adb forward` line is also printed to logcat under the `Boggart` tag. Only adb shell and the app itself can connect; other apps on the device are refused.
+
+| Command | What it does |
+|---|---|
+| `GET /status` | Mode, rule counts, and `lastId`, the id of the latest captured call |
+| `GET /calls?since=&method=&host=&path=&limit=` | Captured calls without bodies. `path` is a glob as in rules |
+| `GET /calls/{id}` | One call with its request, the server's response and the response the app received |
+| `GET /calls/wait?since=&path=&timeoutMs=` | Waits for a matching call and returns it. Answers 408 if none arrives in time |
+| `DELETE /calls` | Clears captured calls |
+| `GET /rules?source=` | Rules in the order they're tried. `source` is `temporary`, `saved`, `preset` or `other` |
+| `PUT /rules/{id}?target=` | Creates or replaces a rule. The body is a rule as in `rules.json`. `target` is `temporary` (default) or `saved` |
+| `PATCH /rules/{id}` | `{"enabled": false}` turns a rule off. Works for presets too |
+| `DELETE /rules/{id}` | Deletes a temporary or saved rule |
+| `POST /rules/import?target=&replace=` | Applies a whole rules document, e.g. one test scenario |
+| `GET /mode`, `PUT /mode` | `{"mode": "offline"}`. One of `active`, `paused`, `offline`, `off` |
+| `POST /reset` | Removes temporary rules, clears captured calls and sets the mode back to `active` |
+
+A typical test step:
+
+```bash
+# 1. Make the user endpoint fail
+curl -X PUT localhost:8765/rules/user-500 -d '{"matcher":{"path":"/users/*"},"override":{"type":"replace","status":500}}'
+
+# 2. Note the latest call id, trigger the screen in the app, then wait for the call
+since=$(curl -s localhost:8765/status | jq .calls.lastId)
+curl "localhost:8765/calls/wait?since=$since&path=/users/*&timeoutMs=10000"
+
+# 3. Clean up before the next test
+curl -X POST localhost:8765/reset
+```
+
+Pass `since` to `/calls/wait` so that a call made before the wait starts isn't missed. Failures return a non-2xx status with `{"error": {"code", "message"}}`. To turn remote control off, set `remoteControl = false` (see [Configuration](#configuration)).
+
 ## Configuration
 
 Boggart starts with the defaults below. To change them, call `BoggartAndroid.configure` in your `Application`. Settings you leave out keep their defaults.
@@ -241,6 +287,7 @@ class App : Application() {
             assetsDir = "boggart"    // assets/<assetsDir>/rules.json
             loadAssets = true        // load presets
             persistence = true       // keep saved rules and preset switches across restarts
+            remoteControl = true     // accept commands over adb (see above)
         }
     }
 }

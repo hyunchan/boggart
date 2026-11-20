@@ -6,7 +6,11 @@ import android.util.Log
 import io.github.hyunchan.boggart.Boggart
 import io.github.hyunchan.boggart.Mode
 import io.github.hyunchan.boggart.Rule
+import io.github.hyunchan.boggart.android.control.ControlServer
+import io.github.hyunchan.boggart.android.control.PresetControlStore
+import io.github.hyunchan.boggart.android.control.SavedControlStore
 import io.github.hyunchan.boggart.android.overlay.OverlayController
+import io.github.hyunchan.boggart.control.BoggartControl
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -43,6 +47,7 @@ public object BoggartAndroid {
     internal const val PRESET_OVERRIDES_FILE = "preset-overrides.json"
     internal const val SAVED_RULES_FILE = "saved-rules.json"
     private const val TAG = "Boggart"
+    private const val CONTROL_SOCKET_PREFIX = "boggart-"
 
     public class Config internal constructor() {
         /** 에셋 디렉토리. `assets/<assetsDir>/rules.json`, `assets/<assetsDir>/bodies/`. */
@@ -62,6 +67,12 @@ public object BoggartAndroid {
 
         /** 버블의 호출 수집 창 길이(ms). 창이 닫힐 때 1건이면 그 교환으로, 2건 이상이면 목록으로 진입한다. */
         public var overlayWindowMs: Long = 2_000
+
+        /**
+         * false면 원격 제어를 열지 않는다. 켜져 있으면 `adb forward tcp:8765 localabstract:boggart-<applicationId>`로
+         * 연결해 호출 확인·규칙 편집·모드 변경을 HTTP(JSON)로 할 수 있다. adb shell과 이 앱의 연결만 받는다.
+         */
+        public var remoteControl: Boolean = true
     }
 
     private class Installation(
@@ -97,6 +108,9 @@ public object BoggartAndroid {
     @Volatile
     private var overlayController: OverlayController? = null
 
+    @Volatile
+    private var controlServer: ControlServer? = null
+
     /** 프리셋 규칙. 설치 전이거나 `loadAssets = false`면 null. */
     public val presetRules: PresetRuleSource? get() = installation?.presetRules
 
@@ -130,6 +144,8 @@ public object BoggartAndroid {
         synchronized(this) {
             overlayController?.stop()
             overlayController = (app as? Application)?.takeIf { config.overlay }?.let { OverlayController(it, config.overlayWindowMs).apply { start() } }
+            controlServer?.stop()
+            controlServer = if (config.remoteControl) startControlServer(app.packageName) else null
         }
     }
 
@@ -179,6 +195,19 @@ public object BoggartAndroid {
                 info(if (ready) "A request waited $waitedMs ms for rules to load" else "A request went ahead after waiting $waitedMs ms; rules weren't loaded yet")
             }
         }
+    }
+
+    private fun startControlServer(packageName: String): ControlServer? {
+        val socketName = "$CONTROL_SOCKET_PREFIX$packageName"
+        val control = BoggartControl(
+            savedRules = { savedRules?.let(::SavedControlStore) },
+            presetRules = { presetRules?.let(::PresetControlStore) },
+            info = { mapOf("packageName" to packageName, "socket" to "localabstract:$socketName") },
+        )
+        val server = ControlServer(socketName, control) { message, error -> Log.w(TAG, message, error) }
+        if (!server.start()) return null
+        Log.i(TAG, "Remote control: adb forward tcp:8765 localabstract:$socketName && curl localhost:8765/")
+        return server
     }
 
     /** 현재 설치의 로딩이 끝날 때까지 기다린다. 로딩이 실패했으면 그 예외를 던진다. 설치 전이면 바로 반환한다. */

@@ -40,6 +40,7 @@ Boggart는 안드로이드 앱의 API 응답을 앱 안에서 실행 중에 바�
 - [규칙 관리](#규칙-관리)
 - [QA 시나리오 모음](#qa-시나리오-모음)
 - [프리셋: 빌드에 시나리오 싣기](#프리셋-빌드에-시나리오-싣기)
+- [명령줄로 제어하기](#명령줄로-제어하기)
 - [설정](#설정)
 - [release 빌드](#release-빌드)
 - [샘플 앱](#샘플-앱)
@@ -226,6 +227,51 @@ src/debug/assets/boggart/bodies/user-404.json
 
 프리셋과 저장 규칙은 앱의 첫 요청부터 적용됩니다. Boggart는 앱이 시작될 때 이 규칙들을 읽고, 다 읽기 전에 나간 요청은 최대 0.5초까지 기다립니다.
 
+## 명령줄로 제어하기
+
+화면에서 하는 일은 UI 없이 adb로도 할 수 있습니다. 명령은 모두 JSON을 주고받으므로 AI 에이전트나 테스트 스크립트가 Boggart를 직접 다룰 수 있습니다. 앱이 보낸 호출을 확인하고, 규칙을 추가·수정하고, 프리셋을 켜고 끄고, 모드를 바꿀 수 있습니다.
+
+debug 앱이 시작되면 Boggart가 로컬 소켓을 엽니다. 기기마다 한 번 컴퓨터로 포워딩한 뒤 `curl`로 부릅니다.
+
+```bash
+adb forward tcp:8765 localabstract:boggart-<applicationId>
+curl localhost:8765/            # 모든 명령과 파라미터
+curl localhost:8765/status
+```
+
+정확한 `adb forward` 명령은 logcat의 `Boggart` 태그에도 찍힙니다. adb shell과 앱 자신만 연결할 수 있고, 기기의 다른 앱은 거절합니다.
+
+| 명령 | 하는 일 |
+|---|---|
+| `GET /status` | 모드, 규칙 수, 마지막으로 캡처한 호출 id(`lastId`) |
+| `GET /calls?since=&method=&host=&path=&limit=` | 바디를 뺀 호출 목록. `path`는 규칙과 같은 글롭 |
+| `GET /calls/{id}` | 호출 하나의 요청, 서버 응답, 앱이 받은 응답 |
+| `GET /calls/wait?since=&path=&timeoutMs=` | 조건에 맞는 호출이 올 때까지 기다렸다가 돌려줌. 시간 안에 안 오면 408 |
+| `DELETE /calls` | 캡처한 호출 비우기 |
+| `GET /rules?source=` | 적용을 시도하는 순서대로 규칙 목록. `source`는 `temporary`·`saved`·`preset`·`other` |
+| `PUT /rules/{id}?target=` | 규칙 만들기·바꾸기. 바디는 `rules.json`의 규칙 하나. `target`은 `temporary`(기본) 또는 `saved` |
+| `PATCH /rules/{id}` | `{"enabled": false}`로 끄기. 프리셋도 됨 |
+| `DELETE /rules/{id}` | 임시·저장 규칙 지우기 |
+| `POST /rules/import?target=&replace=` | 규칙 문서를 한 번에 적용(테스트 시나리오 단위) |
+| `GET /mode`, `PUT /mode` | `{"mode": "offline"}`. `active`·`paused`·`offline`·`off` 중 하나 |
+| `POST /reset` | 임시 규칙 해제, 캡처한 호출 비우기, 모드를 `active`로 |
+
+테스트 한 단계의 예:
+
+```bash
+# 1. 사용자 API를 실패시키기
+curl -X PUT localhost:8765/rules/user-500 -d '{"matcher":{"path":"/users/*"},"override":{"type":"replace","status":500}}'
+
+# 2. 마지막 호출 id를 기억하고, 앱에서 화면을 연 뒤 그 호출을 기다리기
+since=$(curl -s localhost:8765/status | jq .calls.lastId)
+curl "localhost:8765/calls/wait?since=$since&path=/users/*&timeoutMs=10000"
+
+# 3. 다음 테스트 전에 정리
+curl -X POST localhost:8765/reset
+```
+
+`/calls/wait`에는 `since`를 넘겨야 기다리기 전에 이미 나간 호출을 놓치지 않습니다. 실패하면 2xx가 아닌 상태와 `{"error": {"code", "message"}}`를 돌려줍니다. 원격 제어를 끄려면 `remoteControl = false`로 둡니다([설정](#설정) 참고).
+
 ## 설정
 
 Boggart는 아래 기본값으로 시작합니다. 바꾸려면 `Application`에서 `BoggartAndroid.configure`를 부릅니다. 적지 않은 항목은 기본값 그대로입니다.
@@ -241,6 +287,7 @@ class App : Application() {
             assetsDir = "boggart"    // assets/<assetsDir>/rules.json
             loadAssets = true        // 프리셋 불러오기
             persistence = true       // 저장 규칙과 프리셋 켜짐 상태를 재시작 후에도 유지
+            remoteControl = true     // adb로 명령 받기(위 참고)
         }
     }
 }
