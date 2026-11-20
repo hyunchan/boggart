@@ -62,12 +62,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.hyunchan.boggart.Boggart
 import io.github.hyunchan.boggart.Mode
-import io.github.hyunchan.boggart.Provenance
 import io.github.hyunchan.boggart.android.R
 import io.github.hyunchan.boggart.android.ui.common.CallStatus
 import io.github.hyunchan.boggart.android.ui.common.color
 import io.github.hyunchan.boggart.android.ui.common.label
-import io.github.hyunchan.boggart.android.ui.common.status
 import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
@@ -78,8 +76,8 @@ private val SAGE_FILL = Brush.verticalGradient(listOf(Color(0xF5E7F2E3), Color(0
 private val SAGE_TEXT = Color(0xFF24451C)
 private val SAGE_DEEP = Color(0xFF3F7A32)
 
-// 테두리 = 마지막 호출의 상태(원본·조작됨·실패·적용 안 됨). 세이지와 어울리도록 상태색의 채도를 낮췄다.
-// 원본과 적용 안 됨은 멈춰 있고, 조작됨과 실패는 빛줄기가 돈다.
+// 테두리 = 강조 중인 상태(조작됨·실패·적용 안 됨). 세이지와 어울리도록 상태색의 채도를 낮췄다.
+// 강조 중에는 그 색의 빛줄기가 돌고, 강조가 끝나면 원본 색으로 멈춘다.
 private val BORDER_ORIGINAL = Color(0xFF9CBF8F)
 private val BORDER_CHANGED = Color(0xFF8E6FAE)
 private val BORDER_FAILED = Color(0xFFC0584A)
@@ -88,20 +86,17 @@ private val OFFLINE_RED = Color(0xFFB5523E)
 private const val BORDER_SPIN_MS = 1800
 private val STREAK_HEAD = Color.White.copy(alpha = 0.55f)
 
-internal fun Provenance.bubbleBorder(): Color = when (status()) {
+private fun CallStatus.bubbleBorder(): Color = when (this) {
     CallStatus.Original -> BORDER_ORIGINAL
     CallStatus.Changed -> BORDER_CHANGED
     CallStatus.Failed -> BORDER_FAILED
     CallStatus.NotApplied -> BORDER_NOT_APPLIED
 }
-
-/** 조작됨·실패만 빛줄기를 돌린다. 원본과 적용 안 됨은 앱이 원본을 받았으므로 멈춰 둔다. */
-private fun Provenance.spins(): Boolean = status() == CallStatus.Changed || status() == CallStatus.Failed
 private const val ACTIVE_ALPHA = 1f
 private const val IDLE_ALPHA = 0.35f
 
 /**
- * 드래그 가능한 버블. 캡슐에 최근 호출 건수와 활성 규칙 수를, 테두리에 마지막 호출의 Provenance 색을 보여 준다.
+ * 드래그 가능한 버블. 캡슐에 최근 호출 건수와 활성 규칙 수를, 테두리에 강조 중인 상태를 보여 준다.
  * 규칙 일시정지·오프라인이면 캡슐 아래에 모드 칩(기호 + 이름)을 붙인다.
  * 탭하면 진입 대상으로, 길게 누르면 규칙 목록으로 간다. 최근 호출도 활성 규칙도 없고 기본 모드면 그리지 않는다.
  */
@@ -132,13 +127,12 @@ internal fun OverlayBubble(
             .let { Offset(it.x.coerceIn(0f, maxX), it.y.coerceIn(0f, maxY)) }
         // 드래그 제스처는 maxX·maxY가 바뀔 때만 다시 시작하므로 최신 위치를 따로 읽는다.
         val latest by rememberUpdatedState(current)
-        val provenance = shown?.lastProvenance ?: Provenance.Original
         // 최근 호출이 없고 활성 규칙만 남은 대기 상태는 더 옅게 둔다.
         val alpha by animateFloatAsState(if (shown != null || modeAlert) ACTIVE_ALPHA else IDLE_ALPHA, label = "bubbleAlpha")
 
         BubbleFace(
             count = shown?.count,
-            provenance = provenance,
+            highlight = shown?.highlight,
             activeRules = activeRules,
             mode = mode,
             alpha = alpha,
@@ -171,13 +165,13 @@ internal fun OverlayBubble(
  * 버블의 모양만 그린다. 상태를 받지 않으므로 이 파일 아래의 미리보기에서 그대로 쓴다.
  *
  * @param count 최근 호출 건수. 없으면 null.
- * @param provenance 마지막 호출의 상태. 테두리 색이 되고, 원본이 아니면 테두리에 빛줄기가 돈다.
+ * @param highlight 강조 중인 상태. 그 색의 빛줄기가 테두리를 돈다. null이면 원본 색 테두리.
  * @param mode 규칙 일시정지·오프라인이면 캡슐 아래에 모드 칩을 붙인다.
  */
 @Composable
 internal fun BubbleFace(
     count: Int?,
-    provenance: Provenance,
+    highlight: CallStatus?,
     activeRules: Int,
     mode: Mode,
     alpha: Float,
@@ -194,7 +188,7 @@ internal fun BubbleFace(
                 .height(32.dp)
                 .shadow(2.dp, PILL_SHAPE)
                 .background(SAGE_FILL, PILL_SHAPE)
-                .statusBorder(provenance)
+                .statusBorder(highlight)
                 .padding(horizontal = 12.dp),
         ) {
             // 호출도 규칙도 없을 때(모드만 켜짐)는 빈 캡슐 대신 B를 둔다.
@@ -219,11 +213,11 @@ internal fun BubbleFace(
     }
 }
 
-/** 원본이면 세이지 테두리 그대로, 아니면 밝은 빛줄기가 캡슐 테두리를 따라 돈다. */
+/** 강조 중이 아니면 원본 색 테두리 그대로, 강조 중이면 그 색의 빛줄기가 캡슐 테두리를 따라 돈다. */
 @Composable
-private fun Modifier.statusBorder(provenance: Provenance): Modifier {
-    val color = provenance.bubbleBorder()
-    if (!provenance.spins()) return border(2.dp, color, PILL_SHAPE)
+private fun Modifier.statusBorder(highlight: CallStatus?): Modifier {
+    if (highlight == null || highlight == CallStatus.Original) return border(2.dp, BORDER_ORIGINAL, PILL_SHAPE)
+    val color = highlight.bubbleBorder()
     val angle by rememberInfiniteTransition(label = "bubbleBorder").animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -275,21 +269,20 @@ private fun Mode.alert(): Boolean = this == Mode.Paused || this == Mode.Offline
 private data class BubbleSample(
     val caption: String,
     val count: Int?,
-    val provenance: Provenance,
+    val highlight: CallStatus?,
     val activeRules: Int,
     val mode: Mode,
     val alpha: Float,
 )
 
 private val SAMPLES = listOf(
-    BubbleSample("호출 3건\nOriginal", 3, Provenance.Original, 0, Mode.Active, ACTIVE_ALPHA),
-    BubbleSample("교체됨\n규칙 1", 1, Provenance.Replaced, 1, Mode.Active, ACTIVE_ALPHA),
-    BubbleSample("패치됨\n규칙 2", 2, Provenance.Patched, 2, Mode.Active, ACTIVE_ALPHA),
-    BubbleSample("실패\n규칙 1", 1, Provenance.Failed, 1, Mode.Active, ACTIVE_ALPHA),
-    BubbleSample("패치 무시\n규칙 1", 1, Provenance.InvalidIgnored, 1, Mode.Active, ACTIVE_ALPHA),
-    BubbleSample("대기\n규칙만 켜짐", null, Provenance.Original, 1, Mode.Active, IDLE_ALPHA),
-    BubbleSample("규칙 일시정지\n규칙 1", null, Provenance.Original, 1, Mode.Paused, ACTIVE_ALPHA),
-    BubbleSample("오프라인\n막힌 호출", 1, Provenance.Failed, 0, Mode.Offline, ACTIVE_ALPHA),
+    BubbleSample("호출 3건\n강조 없음", 3, null, 0, Mode.Active, ACTIVE_ALPHA),
+    BubbleSample("조작됨\n규칙 1", 12, CallStatus.Changed, 1, Mode.Active, ACTIVE_ALPHA),
+    BubbleSample("실패\n규칙 1", 1, CallStatus.Failed, 1, Mode.Active, ACTIVE_ALPHA),
+    BubbleSample("적용 안 됨\n규칙 1", 1, CallStatus.NotApplied, 1, Mode.Active, ACTIVE_ALPHA),
+    BubbleSample("대기\n규칙만 켜짐", null, null, 1, Mode.Active, IDLE_ALPHA),
+    BubbleSample("규칙 일시정지\n규칙 1", null, null, 1, Mode.Paused, ACTIVE_ALPHA),
+    BubbleSample("오프라인\n막힌 호출", 1, CallStatus.Failed, 0, Mode.Offline, ACTIVE_ALPHA),
 )
 
 /** 버블이 앱 화면 위에 뜨므로 밝은 앱·어두운 앱·색면 바탕에서 본다. */
@@ -304,7 +297,7 @@ private fun BubbleStates(background: Color, captionColor: Color) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(96.dp)) {
                 BubbleFace(
                     count = sample.count,
-                    provenance = sample.provenance,
+                    highlight = sample.highlight,
                     activeRules = sample.activeRules,
                     mode = sample.mode,
                     alpha = sample.alpha,

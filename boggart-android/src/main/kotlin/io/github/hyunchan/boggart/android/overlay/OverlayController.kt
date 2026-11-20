@@ -42,9 +42,9 @@ internal class OverlayController(
         coordinator.skipExisting(Boggart.exchangeLog.exchanges.value)
         scope.launch {
             Boggart.exchangeLog.exchanges.collect { exchanges ->
-                if (coordinator.onExchanges(exchanges)) {
+                coordinator.onExchanges(exchanges).forEach { after ->
                     launch {
-                        delay(coordinator.windowMs)
+                        delay(after)
                         coordinator.tick()
                     }
                 }
