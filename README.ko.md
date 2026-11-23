@@ -60,7 +60,7 @@ Boggart는 안드로이드 앱의 API 응답을 앱 안에서 실행 중에 바�
 
 ### 1. 의존성 추가
 
-Boggart는 Maven Central에 있습니다. debug에는 실제 구현을, release에는 아무 동작도 하지 않는 no-op 구현을 넣으면 앱 코드는 두 빌드에서 그대로 둘 수 있습니다.
+Boggart는 Maven Central에 있고, 버전별 변경 사항은 [릴리스 노트](https://github.com/hyunchan/boggart/releases)에 있습니다. debug에는 실제 구현을, release에는 아무 동작도 하지 않는 no-op 구현을 넣으면 앱 코드는 두 빌드에서 그대로 둘 수 있습니다.
 
 ```kotlin
 dependencies {

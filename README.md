@@ -60,7 +60,7 @@ A boggart is a creature from British folklore; in Harry Potter it takes the shap
 
 ### 1. Add the dependencies
 
-Boggart is on Maven Central. Use the real implementation in debug builds and the no-op one in release builds, so your app code stays the same for both.
+Boggart is on Maven Central, and the [release notes](https://github.com/hyunchan/boggart/releases) list what changed in each version. Use the real implementation in debug builds and the no-op one in release builds, so your app code stays the same for both.
 
 ```kotlin
 dependencies {
