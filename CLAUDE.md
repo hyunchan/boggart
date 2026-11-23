@@ -18,7 +18,7 @@
 
 ## 검증
 
-- `./gradlew check` (테스트, ktlint, Compose 규칙)
+- `./gradlew check` (테스트, ktlint, Compose 규칙, 샘플 release APK에 noop 외의 Boggart 클래스가 없는지)
 - `./gradlew :sample:assembleDebug :sample:assembleRelease` (noop 호환 컴파일 확인)
 - 화면 동작은 `sample` 앱에서 프리셋을 켜 확인한다.
 

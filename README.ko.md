@@ -340,6 +340,8 @@ Boggart는 [App Startup](https://developer.android.com/topic/libraries/app-start
 
 그 밖의 API(규칙·검증을 코드로 다루는 `Boggart`, `Rule`, `BodyValidator` 등)는 debug용 아티팩트에만 있습니다. 이를 쓰는 코드는 debug 소스셋에 두어야 release 빌드가 컴파일됩니다.
 
+이 저장소는 빌드할 때마다 샘플 앱의 release APK를 검사해, `boggart-noop` 밖의 Boggart 클래스가 들어 있으면 실패시킵니다.
+
 ## 샘플 앱
 
 `sample` 모듈은 공개 테스트 API [JSONPlaceholder](https://jsonplaceholder.typicode.com/)를 호출하는 작은 할 일 앱입니다. 빈 목록·서버 오류·파싱 실패·연결 실패마다 다른 화면이 있고, 각 화면을 띄우는 프리셋이 들어 있습니다.

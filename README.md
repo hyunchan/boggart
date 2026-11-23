@@ -340,6 +340,8 @@ If your app already removes App Startup's `InitializationProvider` entirely, for
 
 Everything else, such as `Boggart` (rules and validation from code), `Rule` and `BodyValidator`, exists only in the debug artifacts. Code that uses them has to live in the debug source set, or the release build won't compile.
 
+Every build of this repository checks the sample app's release APK and fails if it contains any Boggart class beyond `boggart-noop`.
+
 ## Sample app
 
 The `sample` module is a small to-do app that calls the public test API [JSONPlaceholder](https://jsonplaceholder.typicode.com/). It has a separate screen for an empty list, a server error, a parse failure and a connection failure, with a preset that triggers each.

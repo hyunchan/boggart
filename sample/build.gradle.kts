@@ -1,3 +1,5 @@
+import java.util.zip.ZipInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -55,3 +57,50 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.activity.compose)
 }
+
+// release APK에 no-op 외의 Boggart 코드가 섞이지 않았는지 확인한다. noop AAR에 있는 클래스만 허용한다.
+val checkReleaseIsolation = tasks.register("checkReleaseIsolation") {
+    group = "verification"
+    description = "Fails if the release APK contains Boggart classes other than boggart-noop."
+    dependsOn("assembleRelease", ":boggart-noop:bundleReleaseAar")
+    val boggartPackage = "io/github/hyunchan/boggart/"
+    val releaseApkDir = layout.buildDirectory.dir("outputs/apk/release")
+    val noopAar = rootProject.layout.projectDirectory.file("boggart-noop/build/outputs/aar/boggart-noop-release.aar")
+    inputs.dir(releaseApkDir)
+    inputs.file(noopAar)
+    doLast {
+        val descriptor = Regex("L(${Regex.escape(boggartPackage)}[A-Za-z0-9_/$]+);")
+        // 샘플 앱 자신의 코드와 noop 모듈의 리소스 클래스(R)는 Boggart 구현이 아니다.
+        val notBoggart = listOf("${boggartPackage}sample/", "${boggartPackage}noop/")
+
+        fun zipEntries(bytes: ByteArray): Sequence<Pair<String, ByteArray>> = sequence {
+            ZipInputStream(bytes.inputStream()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    yield(entry.name to zip.readBytes())
+                }
+            }
+        }
+
+        val noopJar = zipEntries(noopAar.asFile.readBytes()).first { it.first == "classes.jar" }.second
+        val allowed = zipEntries(noopJar).map { it.first }
+            .filter { it.startsWith(boggartPackage) && it.endsWith(".class") }
+            .map { it.removeSuffix(".class") }
+            .toSet()
+
+        val apk = releaseApkDir.get().asFile.walk().single { it.extension == "apk" }
+        val found = zipEntries(apk.readBytes())
+            .filter { it.first.matches(Regex("classes\\d*\\.dex")) }
+            .flatMap { descriptor.findAll(String(it.second, Charsets.ISO_8859_1)).map { match -> match.groupValues[1] } }
+            .filterNot { name -> notBoggart.any(name::startsWith) }
+            .toSortedSet()
+
+        check(found.isNotEmpty()) { "No Boggart classes found in ${apk.name}; the check can't see the no-op either." }
+        // D8이 람다 등을 위해 만든 합성 클래스는 그 클래스를 낳은 원래 클래스로 판정한다.
+        val leaked = found.filterNot { it.substringBefore("$$") in allowed }
+        check(leaked.isEmpty()) { "Release APK contains Boggart classes outside boggart-noop:\n" + leaked.joinToString("\n") }
+        logger.lifecycle("Release isolation: ${found.size} Boggart classes, all from boggart-noop.")
+    }
+}
+
+tasks.named("check") { dependsOn(checkReleaseIsolation) }
