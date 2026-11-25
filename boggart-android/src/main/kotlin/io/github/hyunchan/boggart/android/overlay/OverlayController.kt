@@ -30,11 +30,13 @@ import kotlinx.coroutines.launch
  * Resume 때 붙이고 Pause 때 뗀다. [BoggartActivity]와 `ComponentActivity`가 아닌 Activity에는 붙이지 않는다.
  * `setContentView`를 부르지 않아 DecorView에 화면 수명 정보가 없는 Activity(커스텀 탭을 띄우고 바로 넘기는 화면 등)에도
  * 붙이지 않는다. Compose는 창의 Recomposer를 만들 때 수명 정보를 DecorView에서 찾으므로, 붙이면 앱이 죽는다.
+ * 그 밖에 [filter]가 false를 돌려준 Activity(앱이 뺀 서드파티 화면 등)에도 붙이지 않는다.
  * 버블 위치는 Activity가 바뀌어도 유지된다.
  */
 internal class OverlayController(
     private val application: Application,
     windowMs: Long,
+    private val filter: (Activity) -> Boolean = { true },
 ) : Application.ActivityLifecycleCallbacks {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val coordinator = OverlayCoordinator(clock = System::currentTimeMillis, windowMs = windowMs)
@@ -63,7 +65,7 @@ internal class OverlayController(
     }
 
     override fun onActivityResumed(activity: Activity) {
-        if (activity is BoggartActivity || activity !is ComponentActivity || activity in attached) return
+        if (activity is BoggartActivity || activity !is ComponentActivity || activity in attached || !filter(activity)) return
         val decor = activity.window.decorView as? ViewGroup ?: return
         // 다른 라이브러리의 화면을 고치지 않도록 수명 정보를 대신 넣지 않고 버블만 생략한다.
         if (decor.findViewTreeLifecycleOwner() == null) return

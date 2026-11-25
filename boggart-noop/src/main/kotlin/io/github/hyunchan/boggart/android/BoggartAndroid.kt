@@ -1,5 +1,6 @@
 package io.github.hyunchan.boggart.android
 
+import android.app.Activity
 import android.content.Context
 import io.github.hyunchan.boggart.Mode
 
@@ -18,6 +19,7 @@ public object BoggartAndroid {
         public var mode: Mode? = null
         public var overlay: Boolean = true
         public var overlayWindowMs: Long = 2_000
+        public var overlayFilter: (Activity) -> Boolean = { true }
         public var remoteControl: Boolean = true
     }
 

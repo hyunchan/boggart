@@ -1,5 +1,6 @@
 package io.github.hyunchan.boggart.android
 
+import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.util.Log
@@ -68,6 +69,18 @@ public object BoggartAndroid {
 
         /** 버블의 호출 수집 창 길이(ms). 창이 닫힐 때 1건이면 그 교환으로, 2건 이상이면 목록으로 진입한다. */
         public var overlayWindowMs: Long = 2_000
+
+        /**
+         * 버블을 붙일 화면을 고른다. false를 돌려주는 Activity에는 버블을 붙이지 않는다. 기본은 모든 화면.
+         * 로그인·결제 SDK처럼 앱 밖의 화면을 빼려면 앱 코드의 패키지로 거른다.
+         *
+         * ```
+         * overlayFilter = { it.javaClass.name.startsWith("com.example.") }
+         * ```
+         *
+         * 버블만 빠질 뿐 그 화면에서 나간 호출의 기록과 원격 제어는 그대로다.
+         */
+        public var overlayFilter: (Activity) -> Boolean = { true }
 
         /**
          * false면 원격 제어를 열지 않는다. 켜져 있으면 `adb forward tcp:8765 localabstract:boggart-<applicationId>`로
@@ -141,7 +154,7 @@ public object BoggartAndroid {
         )
         synchronized(this) {
             overlayController?.stop()
-            overlayController = (app as? Application)?.takeIf { config.overlay }?.let { OverlayController(it, config.overlayWindowMs).apply { start() } }
+            overlayController = (app as? Application)?.takeIf { config.overlay }?.let { OverlayController(it, config.overlayWindowMs, config.overlayFilter).apply { start() } }
             controlServer?.stop()
             controlServer = if (config.remoteControl) startControlServer(app.packageName) else null
         }

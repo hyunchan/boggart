@@ -336,6 +336,7 @@ class App : Application() {
 }
 ```
 
+- **Screens without the bubble.** `overlayFilter` chooses the screens that get the bubble. To leave out screens from other libraries, such as a login or payment SDK, filter by your app's code package: `overlayFilter = { it.javaClass.name.startsWith("com.example.") }`. Calls and remote control keep working on those screens. By default every screen gets it, except ones that never call `setContentView`.
 - **Body size.** Bodies over 1 MiB aren't captured, and quick and manual edits aren't applied to them. Stub responses still work. Change the limit with `BoggartInterceptor(maxBodyBytes = …)` or `OkHttp.withBoggart(maxBodyBytes = …)`. Always pass it by name.
 - **Stricter validation.** By default an edited body only has to be valid JSON. To check it against your own schema, set a validator in debug code with `Boggart.configure { validator = BodyValidator { body, mediaType -> … } }`. `Boggart.configure` changes engine settings such as this one; installation settings stay in `BoggartAndroid.configure` above. In the rule editor, untick **Pass the original on if validation fails** to deliver bodies that fail it.
 - **Captured calls.** The last 200 calls are kept in memory only and are gone when the app restarts. Saved rules and preset switches are stored in the app's private storage.
