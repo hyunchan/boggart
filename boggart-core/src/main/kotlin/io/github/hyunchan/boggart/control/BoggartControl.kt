@@ -95,7 +95,9 @@ public class BoggartControl(
             "calls.list",
             "GET",
             "/calls",
-            "Captured calls, oldest first, without bodies. 'lastId' is the newest id in the log.",
+            "Captured calls without bodies, in the order the app received them. A call is captured once the app gets its response " +
+                "(after any delay): 'startedAtMs' is when the app sent it and 'timestampMs' when it got the response. " +
+                "'lastId' is the newest id in the log.",
             params = CALL_FILTERS + listOf(
                 ControlParam("since", "query", "Only calls with an id greater than this.", type = "integer"),
                 ControlParam("limit", "query", "Return at most this many of the newest matches. Default $DEFAULT_LIMIT.", type = "integer"),
@@ -106,7 +108,8 @@ public class BoggartControl(
             "calls.wait",
             "GET",
             "/calls/wait",
-            "Block until a call matching the filters is captured, then return it with bodies. " +
+            "Block until a call matching the filters is captured (when the app has received its response, after any delay), " +
+                "then return it with bodies. " +
                 "Read 'lastId' from /status before triggering the app, and pass it as 'since' so a fast call isn't missed.",
             params = CALL_FILTERS + listOf(
                 ControlParam(

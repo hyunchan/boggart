@@ -133,6 +133,9 @@ class BoggartInterceptorTest {
         get().close()
         val elapsedMs = (System.nanoTime() - start) / 1_000_000
         assertTrue(elapsedMs >= 300, "elapsed $elapsedMs ms")
+        // 기록은 지연이 끝나 앱이 응답을 받을 때 생긴다.
+        val exchange = log.exchanges.value.single()
+        assertTrue(exchange.timestampMs - exchange.startedAtMs >= 300, "recorded ${exchange.timestampMs - exchange.startedAtMs} ms after start")
     }
 
     @Test
@@ -144,6 +147,8 @@ class BoggartInterceptorTest {
             call.cancel()
         }.start()
         assertFailsWith<IOException> { call.execute() }
+        // 앱이 받지 못한 응답은 기록하지 않는다.
+        assertTrue(log.exchanges.value.isEmpty())
     }
 
     @Test

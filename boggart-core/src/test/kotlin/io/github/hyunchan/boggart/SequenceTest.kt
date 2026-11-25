@@ -28,8 +28,8 @@ class SequenceTest {
 
     /** 한 번 호출하고 앱이 받은 상태 코드를 돌려준다. 실패면 -1, 실제 서버면 0. */
     private suspend fun callOnce(): Int = when (val decision = engine.beforeRequest(request)) {
-        is Decision.Respond -> decision.response.status
-        is Decision.Fail -> -1
+        is Decision.Respond -> decision.response.status.also { engine.onDelivered(request, decision) }
+        is Decision.Fail -> -1.also { engine.onDelivered(request, decision) }
         is Decision.Proceed -> engine.afterResponse(request, original, decision).let { if (decision.rule == null) 0 else it.status }
         Decision.Bypass -> 0
     }
@@ -74,7 +74,9 @@ class SequenceTest {
             Override.Fail(FailKind.Timeout, delayMs = 2000),
             Override.Patch(Json.parseToJsonElement("""{"name":"Ron"}"""), delayMs = 300),
         )
-        assertEquals(2000, engine.beforeRequest(request).delayMs)
+        val failed = engine.beforeRequest(request)
+        assertEquals(2000, failed.delayMs)
+        engine.onDelivered(request, failed)
         val decision = assertIs<Decision.Proceed>(engine.beforeRequest(request))
         assertEquals(300, decision.delayMs)
         assertEquals(1, decision.step)

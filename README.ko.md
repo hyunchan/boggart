@@ -275,9 +275,9 @@ curl localhost:8765/status
 | 명령 | 하는 일 |
 |---|---|
 | `GET /status` | 모드, 규칙 수, 마지막으로 캡처한 호출 id(`lastId`) |
-| `GET /calls?since=&method=&host=&path=&limit=` | 바디를 뺀 호출 목록. `path`는 규칙과 같은 글롭 |
+| `GET /calls?since=&method=&host=&path=&limit=` | 바디를 뺀 호출 목록. 앱이 응답을 받은 순서이고, `startedAtMs`는 앱이 요청을 보낸 시각, `timestampMs`는 (지연까지 끝나) 응답을 받은 시각. `path`는 규칙과 같은 글롭 |
 | `GET /calls/{id}` | 호출 하나의 요청, 서버 응답, 앱이 받은 응답 |
-| `GET /calls/wait?since=&path=&timeoutMs=` | 조건에 맞는 호출이 올 때까지 기다렸다가 돌려줌. 시간 안에 안 오면 408 |
+| `GET /calls/wait?since=&path=&timeoutMs=` | 앱이 조건에 맞는 응답을 (지연까지 끝나) 받을 때까지 기다렸다가 그 호출을 돌려줌. 시간 안에 안 오면 408 |
 | `DELETE /calls` | 캡처한 호출 비우기 |
 | `GET /rules?source=` | 적용을 시도하는 순서대로 규칙 목록. `source`는 `temporary`·`saved`·`preset`·`other` |
 | `PUT /rules/{id}?target=` | 규칙 만들기·바꾸기. 바디는 `rules.json`의 규칙 하나. `target`은 `temporary`(기본) 또는 `saved` |

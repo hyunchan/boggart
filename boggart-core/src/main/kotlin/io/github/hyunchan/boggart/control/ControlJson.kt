@@ -72,6 +72,7 @@ internal object ControlJson {
     private fun JsonObjectBuilder.putSummary(exchange: Exchange) {
         put("id", exchange.id)
         put("timestampMs", exchange.timestampMs)
+        put("startedAtMs", exchange.startedAtMs)
         put("method", exchange.request.method)
         put("url", exchange.request.url.toString())
         put("status", exchange.deliveredResponse?.status)

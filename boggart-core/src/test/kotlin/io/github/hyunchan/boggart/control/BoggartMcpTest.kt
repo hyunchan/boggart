@@ -61,7 +61,10 @@ class BoggartMcpTest {
     private suspend fun capture(path: String) {
         val request = BoggartRequest("GET", "https://api.example.com$path")
         val decision = engine.beforeRequest(request)
-        if (decision !is Decision.Respond) engine.afterResponse(request, BoggartResponse(200, body = "{}".toByteArray()), decision)
+        when (decision) {
+            is Decision.Respond, is Decision.Fail -> engine.onDelivered(request, decision)
+            else -> engine.afterResponse(request, BoggartResponse(200, body = "{}".toByteArray()), decision)
+        }
     }
 
     @Test

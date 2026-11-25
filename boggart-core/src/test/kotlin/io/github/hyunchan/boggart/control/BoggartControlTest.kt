@@ -79,9 +79,9 @@ class BoggartControlTest {
 
     private suspend fun capture(path: String, status: Int = 200, body: String = """{"ok":true}""") {
         val request = BoggartRequest("GET", "https://api.example.com$path")
-        val decision = engine.beforeRequest(request)
-        if (decision !is Decision.Respond) {
-            engine.afterResponse(request, BoggartResponse(status, body = body.toByteArray(), mediaType = "application/json"), decision)
+        when (val decision = engine.beforeRequest(request)) {
+            is Decision.Respond, is Decision.Fail -> engine.onDelivered(request, decision)
+            else -> engine.afterResponse(request, BoggartResponse(status, body = body.toByteArray(), mediaType = "application/json"), decision)
         }
     }
 

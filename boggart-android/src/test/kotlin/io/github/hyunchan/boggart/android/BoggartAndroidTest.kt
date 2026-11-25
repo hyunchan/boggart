@@ -109,7 +109,7 @@ class BoggartAndroidTest {
         assertEquals("temporary", assertIs<Decision.Respond>(Boggart.engine.beforeRequest(request)).rule?.id)
 
         assertTrue(BoggartAndroid.demote("temporary"))
-        assertEquals(Decision.Proceed(), Boggart.engine.beforeRequest(request))
+        assertNull(assertIs<Decision.Proceed>(Boggart.engine.beforeRequest(request)).rule)
     }
 
     @Test

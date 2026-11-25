@@ -58,10 +58,12 @@ public class BoggartInterceptor(
             is Decision.Proceed -> proceed(chain, boggartRequest, decision)
             is Decision.Respond -> {
                 delay(chain, decision.delayMs)
+                engine.onDelivered(boggartRequest, decision)
                 decision.response.toOkHttpResponse(request)
             }
             is Decision.Fail -> {
                 delay(chain, decision.delayMs)
+                engine.onDelivered(boggartRequest, decision)
                 throw decision.kind.toException(request)
             }
         }
@@ -89,7 +91,7 @@ public class BoggartInterceptor(
         if (uncaptured) {
             // 패치 없이 원본을 넘기되 교환은 바디 없이 기록한다.
             val captured = BoggartResponse(response.code, headers, null, mediaType)
-            runBlocking { engine.afterResponse(boggartRequest, captured, Decision.Proceed()) }
+            runBlocking { engine.afterResponse(boggartRequest, captured, Decision.Proceed(startedAtMs = decision.startedAtMs)) }
             return response
         }
         val body = response.body.use { it.bytes() }

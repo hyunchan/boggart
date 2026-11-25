@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BoggartTest {
@@ -36,7 +37,7 @@ class BoggartTest {
         assertIs<Decision.Respond>(Boggart.engine.beforeRequest(request))
         Boggart.riddikulus()
         assertTrue(Boggart.temporaryRules.rules.value.isEmpty())
-        assertEquals(Decision.Proceed(), Boggart.engine.beforeRequest(request))
+        assertNull(assertIs<Decision.Proceed>(Boggart.engine.beforeRequest(request)).rule)
     }
 
     @Test

@@ -77,10 +77,12 @@ public class BoggartHttpClientEngine(
             is Decision.Proceed -> proceed(data, boggartRequest, decision)
             is Decision.Respond -> {
                 delay(decision.delayMs)
+                engine.onDelivered(boggartRequest, decision)
                 decision.response.toResponseData(callContext())
             }
             is Decision.Fail -> {
                 delay(decision.delayMs)
+                engine.onDelivered(boggartRequest, decision)
                 throw decision.kind.toException(data)
             }
         }
@@ -102,7 +104,7 @@ public class BoggartHttpClientEngine(
         val mediaType = response.headers[HttpHeaders.ContentType]
         val declaredLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: -1L
         if (channel == null || isStreaming(mediaType) || declaredLength > maxBodyBytes) {
-            recordUncaptured(boggartRequest, response, headers, mediaType)
+            recordUncaptured(boggartRequest, response, headers, mediaType, decision.startedAtMs)
             return response
         }
         val bytes = try {
@@ -115,7 +117,7 @@ public class BoggartHttpClientEngine(
         }
         if (bytes.size > maxBodyBytes) {
             // 이미 읽은 앞부분과 남은 채널을 이어 붙여 원본 그대로 넘긴다.
-            recordUncaptured(boggartRequest, response, headers, mediaType)
+            recordUncaptured(boggartRequest, response, headers, mediaType, decision.startedAtMs)
             val rejoined = CoroutineScope(response.callContext).writer {
                 this.channel.writeFully(bytes)
                 channel.copyAndClose(this.channel)
@@ -135,9 +137,10 @@ public class BoggartHttpClientEngine(
         response: HttpResponseData,
         headers: BoggartHeaders,
         mediaType: String?,
+        startedAtMs: Long?,
     ) {
         val captured = BoggartResponse(response.statusCode.value, headers, null, mediaType)
-        engine.afterResponse(request, captured, Decision.Proceed())
+        engine.afterResponse(request, captured, Decision.Proceed(startedAtMs = startedAtMs))
     }
 
     override fun close() {

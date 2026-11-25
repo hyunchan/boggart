@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** 파일에서 비동기로 읽는 출처를 흉내 낸다. [finishLoading]을 부를 때까지 준비되지 않는다. */
@@ -52,7 +53,7 @@ class RulesReadyTest {
         val engine = BoggartEngine(RuleRepository(listOf(source)))
         var reported: Boolean? = null
         engine.onRulesWait = { _, ready -> reported = ready }
-        assertEquals(Decision.Proceed(), engine.beforeRequest(request))
+        assertNull(assertIs<Decision.Proceed>(engine.beforeRequest(request)).rule)
         assertEquals(500, currentTime)
         assertEquals(false, reported)
     }

@@ -275,9 +275,9 @@ The exact `adb forward` line is also printed to logcat under the `Boggart` tag. 
 | Command | What it does |
 |---|---|
 | `GET /status` | Mode, rule counts, and `lastId`, the id of the latest captured call |
-| `GET /calls?since=&method=&host=&path=&limit=` | Captured calls without bodies. `path` is a glob as in rules |
+| `GET /calls?since=&method=&host=&path=&limit=` | Captured calls without bodies, in the order the app received them. `startedAtMs` is when the app sent the request, `timestampMs` when it got the response (after any delay). `path` is a glob as in rules |
 | `GET /calls/{id}` | One call with its request, the server's response and the response the app received |
-| `GET /calls/wait?since=&path=&timeoutMs=` | Waits for a matching call and returns it. Answers 408 if none arrives in time |
+| `GET /calls/wait?since=&path=&timeoutMs=` | Waits until the app has received a matching response (after any delay) and returns the call. Answers 408 if none arrives in time |
 | `DELETE /calls` | Clears captured calls |
 | `GET /rules?source=` | Rules in the order they're tried. `source` is `temporary`, `saved`, `preset` or `other` |
 | `PUT /rules/{id}?target=` | Creates or replaces a rule. The body is a rule as in `rules.json`. `target` is `temporary` (default) or `saved` |

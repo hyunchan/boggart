@@ -13,7 +13,8 @@ import kotlin.test.assertTrue
 class BoggartEngineTest {
     private val temporary = TemporaryRuleSource()
     private val log = ExchangeLog()
-    private val engine = BoggartEngine(RuleRepository(listOf(temporary)), log, clock = { 1000L })
+    private var now = 1000L
+    private val engine = BoggartEngine(RuleRepository(listOf(temporary)), log, clock = { now })
 
     private val request = BoggartRequest("GET", "https://api.example.com/users/1")
     private val original = BoggartResponse(
@@ -31,7 +32,7 @@ class BoggartEngineTest {
     @Test
     fun `no rule proceeds and records original`() = runTest {
         val decision = engine.beforeRequest(request)
-        assertEquals(Decision.Proceed(), decision)
+        assertNull(assertIs<Decision.Proceed>(decision).rule)
         assertSame(original, engine.afterResponse(request, original, decision))
         val exchange = log.exchanges.value.single()
         assertEquals(Provenance.Original, exchange.provenance)
@@ -50,10 +51,31 @@ class BoggartEngineTest {
         assertEquals("application/json", decision.response.mediaType)
         assertEquals(Provenance.Replaced, decision.provenance)
         assertEquals(300, decision.delayMs)
+        // 어댑터가 지연을 마치고 앱에 넘길 때 기록한다. 그 전에는 /calls/wait가 돌아오면 안 된다.
+        assertTrue(log.exchanges.value.isEmpty())
+        now = 1300L
+        engine.onDelivered(request, decision)
         val exchange = log.exchanges.value.single()
         assertEquals(Provenance.Replaced, exchange.provenance)
         assertNull(exchange.originalResponse)
         assertEquals("r1", exchange.appliedRuleId)
+        assertEquals(1000L, exchange.startedAtMs)
+        assertEquals(1300L, exchange.timestampMs)
+    }
+
+    @Test
+    fun `records are ordered by when the app got them`() = runTest {
+        addRule(Override.Replace(status = 200, delayMs = 500))
+        val slow = engine.beforeRequest(request)
+        val other = BoggartRequest("GET", "https://api.example.com/posts")
+        val fast = engine.beforeRequest(other)
+        now = 1100L
+        engine.afterResponse(other, original, fast)
+        now = 1500L
+        engine.onDelivered(request, slow)
+        assertEquals(listOf("/posts", "/users/1"), log.exchanges.value.map { it.request.url.path })
+        assertEquals(listOf(1L, 2L), log.exchanges.value.map { it.id })
+        assertEquals(listOf(1000L, 1000L), log.exchanges.value.map { it.startedAtMs })
     }
 
     @Test
@@ -103,6 +125,9 @@ class BoggartEngineTest {
         val decision = assertIs<Decision.Fail>(engine.beforeRequest(request))
         assertEquals(FailKind.Timeout, decision.kind)
         assertEquals(5000, decision.delayMs)
+        // 지연을 마치고 앱에 넘길 때 기록한다.
+        assertTrue(log.exchanges.value.isEmpty())
+        engine.onDelivered(request, decision)
         val exchange = log.exchanges.value.single()
         assertEquals(Provenance.Failed, exchange.provenance)
         assertNull(exchange.deliveredResponse)
@@ -217,7 +242,7 @@ class BoggartEngineTest {
         addRule(Override.Fail(FailKind.Timeout))
         engine.mode = Mode.Paused
         val decision = engine.beforeRequest(request)
-        assertEquals(Decision.Proceed(), decision)
+        assertNull(assertIs<Decision.Proceed>(decision).rule)
         engine.afterResponse(request, original, decision)
         assertEquals(Provenance.Original, log.exchanges.value.single().provenance)
     }
@@ -228,6 +253,7 @@ class BoggartEngineTest {
         val decision = assertIs<Decision.Fail>(engine.beforeRequest(request))
         assertEquals(FailKind.UnknownHost, decision.kind)
         assertNull(decision.rule)
+        engine.onDelivered(request, decision)
         val exchange = log.exchanges.value.single()
         assertEquals(Provenance.Failed, exchange.provenance)
         assertEquals("Offline mode: no rule for this call", exchange.error)
@@ -240,7 +266,7 @@ class BoggartEngineTest {
     fun `active mode passes unmatched and overrides matched`() = runTest {
         addRule(Override.Replace(body = "{}"))
         assertIs<Decision.Respond>(engine.beforeRequest(request))
-        assertEquals(Decision.Proceed(), engine.beforeRequest(BoggartRequest("GET", "https://api.example.com/posts")))
+        assertNull(assertIs<Decision.Proceed>(engine.beforeRequest(BoggartRequest("GET", "https://api.example.com/posts"))).rule)
     }
 
     @Test

@@ -12,6 +12,9 @@ import java.util.concurrent.atomic.AtomicLong
 public sealed interface Decision {
     public val delayMs: Long
 
+    /** [BoggartEngine.beforeRequest]가 불린 시각. 기록의 [Exchange.startedAtMs]가 된다. 알 수 없으면 null. */
+    public val startedAtMs: Long? get() = null
+
     /** 조작·캡처를 모두 건너뛴다([Mode.Off]). [BoggartEngine.afterResponse]는 응답을 그대로 돌려준다. */
     public data object Bypass : Decision {
         override val delayMs: Long get() = 0
@@ -30,21 +33,33 @@ public sealed interface Decision {
         override val delayMs: Long = 0,
         val override: Override? = rule?.override,
         val step: Int? = null,
+        override val startedAtMs: Long? = null,
     ) : Decision
 
-    /** 실제 호출 없이 [response]를 전달한다. 캡처는 이미 끝났으므로 afterResponse를 부르지 않는다. */
+    /**
+     * 실제 호출 없이 [response]를 전달한다. 어댑터는 지연 뒤 앱에 넘기기 직전에 [BoggartEngine.onDelivered]를 불러 기록한다.
+     *
+     * @property step [Override.Sequence]에서 고른 단계(0부터). 순차 응답이 아니면 null.
+     */
     public data class Respond(
         val response: BoggartResponse,
         val provenance: Provenance,
         val rule: Rule?,
         override val delayMs: Long = 0,
+        val step: Int? = null,
+        override val startedAtMs: Long? = null,
     ) : Decision
 
-    /** 실제 호출 없이 [kind] 에러를 유발한다. 캡처는 이미 끝났다. */
+    /**
+     * 실제 호출 없이 [kind] 에러를 유발한다. 어댑터는 지연 뒤 예외를 던지기 직전에 [BoggartEngine.onDelivered]를 불러 기록한다.
+     * [rule]이 null이면 Offline 모드에서 규칙이 없어 막은 호출이다.
+     */
     public data class Fail(
         val kind: FailKind,
         val rule: Rule?,
         override val delayMs: Long = 0,
+        val step: Int? = null,
+        override val startedAtMs: Long? = null,
     ) : Decision
 }
 
@@ -54,7 +69,9 @@ public data class SequenceCursor(val rule: Rule, val next: Int)
 /**
  * 규칙 매칭, 응답 조작, 패치 검증, 교환 캡처를 수행하는 엔진. 네트워크 라이브러리를 모른다.
  *
- * 어댑터 흐름: [beforeRequest] → (Proceed/Bypass면) 실제 호출 → 성공하면 [afterResponse], 예외면 [onFailure].
+ * 어댑터 흐름: [beforeRequest] → 지연 → Proceed면 실제 호출 후 성공하면 [afterResponse], 예외면 [onFailure].
+ * Respond·Fail이면 앱에 넘기기 직전에 [onDelivered]. 그래서 모든 기록이 앱이 응답(또는 실패)을 받는 시점에 생기고,
+ * [ExchangeLog]의 순서와 [Exchange.id]도 그 시점 순서다.
  */
 public class BoggartEngine(
     public val repository: RuleRepository,
@@ -91,18 +108,18 @@ public class BoggartEngine(
         }
 
     public suspend fun beforeRequest(request: BoggartRequest): Decision {
+        val startedAt = clock()
         when (mode) {
             Mode.Off -> return Decision.Bypass
-            Mode.Paused -> return Decision.Proceed()
+            Mode.Paused -> return Decision.Proceed(startedAtMs = startedAt)
             Mode.Active, Mode.Offline -> Unit
         }
         awaitRules()
         val rule = repository.find(request)
         if (rule == null) {
-            if (mode != Mode.Offline) return Decision.Proceed()
+            if (mode != Mode.Offline) return Decision.Proceed(startedAtMs = startedAt)
             // 네트워크 없음으로 실패시켜 앱의 오프라인 처리(UnknownHostException 등)가 동작하게 한다.
-            record(request, null, null, Provenance.Failed, null, OFFLINE_ERROR)
-            return Decision.Fail(FailKind.UnknownHost, null)
+            return Decision.Fail(FailKind.UnknownHost, null, startedAtMs = startedAt)
         }
         val sequence = rule.override as? Override.Sequence
         val step = sequence?.let { advance(rule, it) }
@@ -110,23 +127,18 @@ public class BoggartEngine(
             sequence == null -> rule.override
             step == null -> {
                 // 단계를 다 쓰고 then = original. 규칙이 없는 호출처럼 다룬다.
-                if (mode != Mode.Offline) return Decision.Proceed()
-                record(request, null, null, Provenance.Failed, null, OFFLINE_ERROR)
-                return Decision.Fail(FailKind.UnknownHost, null)
+                if (mode != Mode.Offline) return Decision.Proceed(startedAtMs = startedAt)
+                return Decision.Fail(FailKind.UnknownHost, null, startedAtMs = startedAt)
             }
             else -> sequence.steps[step]
         }
         return when (override) {
             is Override.Replace -> {
-                val response = buildReplacement(override) ?: return Decision.Proceed(rule, override.delayMs, override, step)
-                record(request, null, response, Provenance.Replaced, rule.id, step = step)
-                Decision.Respond(response, Provenance.Replaced, rule, override.delayMs)
+                val response = buildReplacement(override) ?: return Decision.Proceed(rule, override.delayMs, override, step, startedAt)
+                Decision.Respond(response, Provenance.Replaced, rule, override.delayMs, step, startedAt)
             }
-            is Override.Patch, is Override.JsonPatch -> Decision.Proceed(rule, override.delayMs, override, step)
-            is Override.Fail -> {
-                record(request, null, null, Provenance.Failed, rule.id, step = step)
-                Decision.Fail(override.kind, rule, override.delayMs)
-            }
+            is Override.Patch, is Override.JsonPatch -> Decision.Proceed(rule, override.delayMs, override, step, startedAt)
+            is Override.Fail -> Decision.Fail(override.kind, rule, override.delayMs, step, startedAt)
             is Override.Sequence -> error("A sequence step can't be another sequence")
         }
     }
@@ -192,24 +204,24 @@ public class BoggartEngine(
         val override = decision.override
         val step = decision.step
         if (rule == null || override == null) {
-            record(request, response, response, Provenance.Original, null)
+            record(request, response, response, Provenance.Original, null, startedAt = decision.startedAtMs)
             return response
         }
         val (patchedBody, ruleOnInvalid) = when (override) {
             is Override.Patch -> applyPatch(response.body) { JsonMergePatch.apply(it, override.patch) } to override.onInvalid
             is Override.JsonPatch -> applyPatch(response.body) { JsonPatch.apply(it, override.ops) } to override.onInvalid
             is Override.Replace, is Override.Fail, is Override.Sequence -> {
-                record(request, response, response, Provenance.InvalidIgnored, rule.id, step = step)
+                record(request, response, response, Provenance.InvalidIgnored, rule.id, step = step, startedAt = decision.startedAtMs)
                 return response
             }
         }
         if (patchedBody == null) {
-            record(request, response, response, Provenance.InvalidIgnored, rule.id, step = step)
+            record(request, response, response, Provenance.InvalidIgnored, rule.id, step = step, startedAt = decision.startedAtMs)
             return response
         }
         val valid = validator.validate(patchedBody, response.mediaType)
         if (!valid && (ruleOnInvalid ?: onInvalidPatch) == OnInvalidPatch.Ignore) {
-            record(request, response, response, Provenance.InvalidIgnored, rule.id, step = step)
+            record(request, response, response, Provenance.InvalidIgnored, rule.id, step = step, startedAt = decision.startedAtMs)
             return response
         }
         val headers = if (CONTENT_LENGTH in response.headers) {
@@ -218,8 +230,33 @@ public class BoggartEngine(
             response.headers
         }
         val delivered = response.copy(headers = headers, body = patchedBody)
-        record(request, response, delivered, if (valid) Provenance.Patched else Provenance.PatchedInvalid, rule.id, step = step)
+        record(request, response, delivered, if (valid) Provenance.Patched else Provenance.PatchedInvalid, rule.id, step = step, startedAt = decision.startedAtMs)
         return delivered
+    }
+
+    /**
+     * [Decision.Respond]·[Decision.Fail]을 앱에 넘기기 직전(지연 뒤)에 호출한다. 그 호출을 기록한다.
+     * 그 외 결정에 대해서는 아무것도 하지 않는다. 지연 중 취소돼 앱이 받지 못한 호출은 부르지 않으므로 기록되지 않는다.
+     */
+    public fun onDelivered(request: BoggartRequest, decision: Decision) {
+        when (decision) {
+            is Decision.Respond ->
+                record(request, null, decision.response, decision.provenance, decision.rule?.id, step = decision.step, startedAt = decision.startedAtMs)
+            is Decision.Fail -> {
+                val offline = decision.rule == null
+                record(
+                    request,
+                    null,
+                    null,
+                    Provenance.Failed,
+                    decision.rule?.id,
+                    error = if (offline) OFFLINE_ERROR else null,
+                    step = decision.step,
+                    startedAt = decision.startedAtMs,
+                )
+            }
+            Decision.Bypass, is Decision.Proceed -> Unit
+        }
     }
 
     /**
@@ -228,7 +265,7 @@ public class BoggartEngine(
      */
     public fun onFailure(request: BoggartRequest, decision: Decision, error: Throwable) {
         if (decision !is Decision.Proceed) return
-        record(request, null, null, Provenance.Original, null, error.toString())
+        record(request, null, null, Provenance.Original, null, error.toString(), startedAt = decision.startedAtMs)
     }
 
     /** 원래 바디가 JSON이 아니거나 JSON Patch 경로를 찾지 못해 패치할 수 없으면 null. */
@@ -265,9 +302,11 @@ public class BoggartEngine(
         ruleId: String?,
         error: String? = null,
         step: Int? = null,
+        startedAt: Long? = null,
     ) {
+        val now = clock()
         exchangeLog.add(
-            Exchange(nextId.getAndIncrement(), clock(), request, original, delivered, provenance, ruleId, error, step),
+            Exchange(nextId.getAndIncrement(), now, request, original, delivered, provenance, ruleId, error, step, startedAt ?: now),
         )
     }
 
