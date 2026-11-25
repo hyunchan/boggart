@@ -182,6 +182,13 @@ internal fun CallDetailContent(
                                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.boggart_more))
                             }
                             DropdownMenu(expanded = copyMenu, onDismissRequest = { copyMenu = false }) {
+                                // 고칠 대상이 순차 응답이면 바꾸지 않고 지금 조작을 다음 단계로 쌓을 수 있다.
+                                if (state.canAppendStep) {
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.boggart_append_step)) }, onClick = {
+                                        copyMenu = false
+                                        onIntent(CallDetailIntent.AppendStep)
+                                    })
+                                }
                                 DropdownMenuItem(text = { Text(stringResource(R.string.boggart_copy_url)) }, onClick = {
                                     copyMenu = false
                                     copy(exchange.request.url.toString())

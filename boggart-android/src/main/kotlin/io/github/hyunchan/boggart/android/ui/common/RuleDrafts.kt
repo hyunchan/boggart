@@ -42,6 +42,8 @@ internal enum class DraftError {
     NoValueChanges,
     ValuesNotJson,
     CannotApply,
+    InvalidTimes,
+    InvalidPercent,
 }
 
 /** 편집 화면 입력을 규칙으로 바꾸는 순수 함수 모음. Compose와 무관하게 JVM에서 검증한다. */

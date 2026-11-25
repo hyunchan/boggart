@@ -45,6 +45,12 @@ internal data class RuleForm(
     val failKind: FailKind,
     val customMessage: String,
     val then: SequenceEnd = SequenceEnd.Last,
+    /** 순차 응답의 단계, 또는 확률 조작 규칙의 입력 하나. */
+    val steps: List<StepForm> = emptyList(),
+    /** 단계 목록으로 편집하는지. 순차 응답 규칙이거나 "순차 응답으로 바꾸기"를 눌렀으면 true. */
+    val sequence: Boolean = false,
+    /** 펼친 단계. 한 번에 하나만 펼친다. */
+    val expanded: Int? = null,
 ) {
     companion object {
         fun of(rule: Rule): RuleForm {
@@ -66,6 +72,12 @@ internal data class RuleForm(
                 failKind = (override as? Override.Fail)?.kind ?: FailKind.Timeout,
                 customMessage = ((override as? Override.Fail)?.kind as? FailKind.Custom)?.message ?: "Simulated by Boggart",
                 then = (override as? Override.Sequence)?.then ?: SequenceEnd.Last,
+                steps = when (override) {
+                    is Override.Sequence -> override.steps.map(StepForm::of)
+                    is Override.Chance -> listOf(StepForm.of(override))
+                    else -> emptyList()
+                },
+                sequence = override is Override.Sequence,
             )
         }
     }
@@ -104,6 +116,15 @@ internal sealed interface RuleEditIntent {
 
     /** 순차 응답을 처음부터 다시 시작한다. */
     data object RestartSequence : RuleEditIntent
+
+    /** 지금 조작을 첫 단계로 하는 순차 응답으로 바꾼다. 적용·저장을 눌러야 반영된다. */
+    data object ConvertToSequence : RuleEditIntent
+    data class EditStep(val index: Int, val step: StepForm) : RuleEditIntent
+    data class ToggleStep(val index: Int) : RuleEditIntent
+    data class MoveStep(val index: Int, val delta: Int) : RuleEditIntent
+    data class DuplicateStep(val index: Int) : RuleEditIntent
+    data class RemoveStep(val index: Int) : RuleEditIntent
+    data class AddStep(val kind: StepKind) : RuleEditIntent
     data class SetPresetEnabled(val enabled: Boolean) : RuleEditIntent
 }
 
@@ -161,6 +182,26 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
                 effectChannel.send(UiEffect.Message(UiMessage(R.string.boggart_sequence_restarted)))
             }
             is RuleEditIntent.SetPresetEnabled -> viewModelScope.launch { store.setEnabled(origin, rule, intent.enabled) }
+            RuleEditIntent.ConvertToSequence -> convertToSequence()
+            is RuleEditIntent.EditStep -> editSteps { it.toMutableList().apply { set(intent.index, intent.step) } }
+            is RuleEditIntent.ToggleStep -> form.update { f -> f?.copy(expanded = intent.index.takeIf { it != f.expanded }) }
+            is RuleEditIntent.MoveStep -> form.update { f ->
+                f?.copy(steps = StepEdits.move(f.steps, intent.index, intent.delta), expanded = (intent.index + intent.delta).takeIf { f.expanded == intent.index } ?: f.expanded)
+            }
+            is RuleEditIntent.DuplicateStep -> form.update { f -> f?.copy(steps = StepEdits.duplicate(f.steps, intent.index), expanded = intent.index + 1) }
+            is RuleEditIntent.RemoveStep -> form.update { f -> f?.copy(steps = StepEdits.remove(f.steps, intent.index), expanded = null) }
+            is RuleEditIntent.AddStep -> form.update { f -> f?.copy(steps = f.steps + StepForm.new(intent.kind), expanded = f.steps.size) }
+        }
+    }
+
+    private fun editSteps(transform: (List<StepForm>) -> List<StepForm>) {
+        form.update { it?.copy(steps = transform(it.steps)) }
+    }
+
+    private fun convertToSequence() {
+        when (val draft = edited() ?: return) {
+            is Draft.Error -> effectChannel.trySend(UiEffect.Message(UiMessage(draft.reason.messageRes())))
+            is Draft.Ok -> form.update { it?.copy(sequence = true, steps = listOf(StepForm.of(draft.rule.override)), expanded = 0) }
         }
     }
 
@@ -181,6 +222,16 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
         val f = form.value ?: return null
         val delayMs = f.delay.toLongOrNull() ?: 0
         val base = RuleDrafts.editMatcher(rule, f.method, f.host, f.path, f.matchHeaders)
+        if (f.sequence) {
+            val (steps, error) = StepEdits.buildAll(f.steps)
+            if (steps == null) {
+                // 잘못된 단계를 펼쳐 어디를 고칠지 보이게 한다.
+                val (index, reason) = checkNotNull(error)
+                form.update { it?.copy(expanded = index) }
+                return Draft.Error(reason)
+            }
+            return Draft.Ok(base.copy(override = Override.Sequence(steps, f.then)))
+        }
         return when (val override = rule.override) {
             is Override.Replace -> Draft.Ok(
                 RuleDrafts.editReplace(base, f.status.toIntOrNull() ?: 200, f.responseHeaders, f.body.orEmpty(), f.shownBody.orEmpty(), delayMs),
@@ -193,8 +244,11 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
             }
             // 단계는 화면에서 고치지 않는다(rules.json·원격 제어). 조건과 마지막 뒤 동작만 바꾼다.
             is Override.Sequence -> Draft.Ok(base.copy(override = override.copy(then = f.then)))
-            // 확률과 안의 조작은 화면에서 고치지 않는다. 조건만 바꾼다.
-            is Override.Chance -> Draft.Ok(base.copy(override = override))
+            // 확률 조작 규칙은 입력 하나로 고친다. 확률을 끄면 안쪽 조작만 남는다.
+            is Override.Chance -> when (val built = f.steps.single().copy(times = "1").build()) {
+                is StepForm.Built.Ok -> Draft.Ok(base.copy(override = built.step.override))
+                is StepForm.Built.Error -> Draft.Error(built.reason)
+            }
         }
     }
 }

@@ -27,6 +27,8 @@ internal fun DraftError.messageRes(): Int = when (this) {
     DraftError.NoValueChanges -> R.string.boggart_error_no_value_changes
     DraftError.ValuesNotJson -> R.string.boggart_error_values_not_json
     DraftError.CannotApply -> R.string.boggart_error_cannot_apply
+    DraftError.InvalidTimes -> R.string.boggart_error_invalid_times
+    DraftError.InvalidPercent -> R.string.boggart_error_invalid_percent
 }
 
 @Composable
@@ -137,7 +139,10 @@ internal fun overrideSentence(override: Override, nextStep: Int? = null): String
         }
         is Override.Sequence -> {
             val size = override.steps.size
-            val count = pluralStringResource(R.plurals.boggart_desc_sequence, size, size)
+            val calls = override.calls
+            // 반복 횟수가 있으면 호출 수가 단계 수와 달라 따로 적는다.
+            val count = pluralStringResource(R.plurals.boggart_desc_sequence_steps, size, size) +
+                if (calls != size) " · " + pluralStringResource(R.plurals.boggart_desc_sequence_calls, calls, calls) else ""
             when {
                 nextStep == null -> count
                 nextStep < size -> count + " · " + stringResource(R.string.boggart_sequence_next, nextStep + 1)

@@ -94,4 +94,60 @@ class RuleEditViewModelTest {
         assertEquals(0, vm.state.value.nextStep)
         assertNull(RuleEditViewModel("other", store).state.value.nextStep)
     }
+
+    @Test
+    fun `steps can be added, edited, moved and removed before applying`() = runTest {
+        val store = FakeBoggartStore()
+        store.upsert(RuleTarget.Temporary("t"), rule("t", Override.Sequence(listOf(SequenceStep(Override.Replace(status = 500))))))
+        val vm = RuleEditViewModel("t", store)
+        vm.onIntent(RuleEditIntent.AddStep(StepKind.Error))
+        assertEquals(1, vm.state.value.form?.expanded)
+        val added = vm.state.value.form!!.steps[1]
+        vm.onIntent(RuleEditIntent.EditStep(1, added.copy(times = "3", chance = true, percent = "40")))
+        vm.onIntent(RuleEditIntent.MoveStep(1, -1))
+        vm.onIntent(RuleEditIntent.DuplicateStep(1))
+        vm.onIntent(RuleEditIntent.RemoveStep(2))
+        vm.onIntent(RuleEditIntent.Apply)
+        vm.effects.first()
+        val applied = assertIs<Override.Sequence>(store.currentRules().temporary.single().override)
+        assertEquals(
+            listOf(SequenceStep(Override.Chance(40, Override.Fail(FailKind.Timeout)), times = 3), SequenceStep(Override.Replace(status = 500))),
+            applied.steps,
+        )
+    }
+
+    @Test
+    fun `a bad step is opened and reported instead of applied`() = runTest {
+        val store = FakeBoggartStore()
+        store.upsert(RuleTarget.Temporary("t"), rule("t", Override.Sequence(listOf(SequenceStep(Override.Replace(status = 500)), SequenceStep(Override.Replace(status = 200))))))
+        val vm = RuleEditViewModel("t", store)
+        vm.onIntent(RuleEditIntent.EditStep(1, vm.state.value.form!!.steps[1].copy(times = "0")))
+        vm.onIntent(RuleEditIntent.Apply)
+        assertEquals(UiEffect.Message(UiMessage(R.string.boggart_error_invalid_times)), vm.effects.first())
+        assertEquals(1, vm.state.value.form?.expanded)
+    }
+
+    @Test
+    fun `a plain rule can be turned into a sequence`() = runTest {
+        val store = FakeBoggartStore()
+        store.upsert(RuleTarget.Temporary("t"), rule("t", Override.Replace(status = 404, body = "{}")))
+        val vm = RuleEditViewModel("t", store)
+        vm.onIntent(RuleEditIntent.ConvertToSequence)
+        vm.onIntent(RuleEditIntent.AddStep(StepKind.Response))
+        vm.onIntent(RuleEditIntent.Apply)
+        vm.effects.first()
+        val applied = assertIs<Override.Sequence>(store.currentRules().temporary.single().override)
+        assertEquals(listOf(SequenceStep(Override.Replace(status = 404, body = "{}")), SequenceStep(Override.Replace(status = 200))), applied.steps)
+    }
+
+    @Test
+    fun `a chance rule edits its percent and inner override`() = runTest {
+        val store = FakeBoggartStore()
+        store.upsert(RuleTarget.Temporary("t"), rule("t", Override.Chance(30, Override.Fail(FailKind.Timeout))))
+        val vm = RuleEditViewModel("t", store)
+        vm.onIntent(RuleEditIntent.EditStep(0, vm.state.value.form!!.steps.single().copy(percent = "70", failKind = FailKind.ConnectionReset)))
+        vm.onIntent(RuleEditIntent.Apply)
+        vm.effects.first()
+        assertEquals(Override.Chance(70, Override.Fail(FailKind.ConnectionReset)), store.currentRules().temporary.single().override)
+    }
 }

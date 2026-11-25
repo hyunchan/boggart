@@ -182,9 +182,13 @@
         <item quantity="one">Sequence · 1 response</item>
         <item quantity="other">Sequence · %d responses</item>
     </plurals>
-    <plurals name="boggart_desc_sequence">
-        <item quantity="one">Responds in turn with 1 response</item>
-        <item quantity="other">Responds in turn with %d responses</item>
+    <plurals name="boggart_desc_sequence_steps">
+        <item quantity="one">1 step in turn</item>
+        <item quantity="other">%d steps in turn</item>
+    </plurals>
+    <plurals name="boggart_desc_sequence_calls">
+        <item quantity="one">1 call</item>
+        <item quantity="other">%d calls</item>
     </plurals>
     <string name="boggart_sequence_next">next is %1$d</string>
     <string name="boggart_sequence_used_up">all used</string>
@@ -197,12 +201,24 @@
     <string name="boggart_sequence_then_original">Let calls reach the server</string>
     <string name="boggart_sequence_restart">Reset to the first</string>
     <string name="boggart_sequence_restarted">The next call gets the first response</string>
-    <string name="boggart_sequence_readonly">Change the responses in rules.json or with remote control.</string>
     <string name="boggart_override_chance">Chance · %1$d%%</string>
     <string name="boggart_desc_chance">%1$d%% of calls: %2$s</string>
     <string name="boggart_sequence_times">%1$s ×%2$d</string>
     <string name="boggart_chance_skipped">Let through by: %1$s</string>
-    <string name="boggart_chance_readonly">Change the chance and the override in rules.json or with remote control.</string>
+    <string name="boggart_sequence_title">Sequence</string>
+    <string name="boggart_error_invalid_times">Repeat must be 1 to 1000.</string>
+    <string name="boggart_error_invalid_percent">Chance must be 1 to 99%.</string>
+    <string name="boggart_error_in_step">Step %1$d: %2$s</string>
+    <string name="boggart_sequence_add_step">Add step</string>
+    <string name="boggart_step_move_up">Move up</string>
+    <string name="boggart_step_move_down">Move down</string>
+    <string name="boggart_step_duplicate">Duplicate</string>
+    <string name="boggart_step_times">Repeat (calls in a row)</string>
+    <string name="boggart_step_chance">Only some calls</string>
+    <string name="boggart_step_percent">Chance (%)</string>
+    <string name="boggart_convert_to_sequence">Turn into a sequence</string>
+    <string name="boggart_append_step">Add as a sequence step</string>
+    <string name="boggart_step_appended">Added as step %1$d. Reload in the app to see it.</string>
     <string name="boggart_sequence_call_step">Response %1$d of %2$d in the sequence</string>
 
     <!-- 호출 상태 (배지 네 가지와 상세 설명) -->

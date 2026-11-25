@@ -99,7 +99,9 @@ internal fun RuleEditContent(
                 actions = {
                     // 프리셋은 파일에서 오므로 지울 수 없다(켜고 끄기만).
                     if (found != null && found.first != RuleOrigin.Preset) {
-                        RemoveMenu(found.first, found.second.name) { onIntent(RuleEditIntent.Remove) }
+                        // 순차 응답이 아니면 지금 조작을 첫 단계로 하는 순차 응답으로 바꿀 수 있다.
+                        val convert = { onIntent(RuleEditIntent.ConvertToSequence) }.takeIf { state.form?.sequence == false }
+                        RemoveMenu(found.first, found.second.name, convert) { onIntent(RuleEditIntent.Remove) }
                     }
                 },
             )
@@ -133,7 +135,7 @@ private fun ColumnScope.PresetRuleView(rule: Rule, nextStep: Int?, onEnabledChan
     }
     Text("${overrideLabel(rule.override)} · ${matcherLabel(rule)}", style = MaterialTheme.typography.bodyMedium)
     val sequence = rule.override as? Override.Sequence
-    if (sequence != null) SequenceSteps(sequence, nextStep, editable = false, onRestart = onRestart)
+    if (sequence != null) PresetSequenceSteps(sequence, nextStep, onRestart)
     Text(stringResource(R.string.boggart_preset_readonly), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
 }
 
@@ -174,6 +176,57 @@ private fun ColumnScope.RuleFormFields(
     Text(stringResource(R.string.boggart_header_match_notice), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
     CodeField(stringResource(R.string.boggart_header_conditions), form.matchHeaders, { edit(form.copy(matchHeaders = it)) })
 
+    if (form.sequence) {
+        SectionTitle(stringResource(R.string.boggart_sequence_title))
+        SequenceEditor(form, nextStep, onIntent)
+        if (override is Override.Sequence) {
+            SequenceRestart(nextStep) { onIntent(RuleEditIntent.RestartSequence) }
+        }
+        Text(stringResource(R.string.boggart_sequence_then), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+        ChoiceRow(SequenceEnd.entries, form.then, { it.label() }) { edit(form.copy(then = it)) }
+    } else {
+        SingleOverrideFields(override, form, edit, onIntent)
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        when (origin) {
+            RuleOrigin.Temporary -> {
+                OutlinedButton(onClick = { onIntent(RuleEditIntent.Apply) }) { Text(stringResource(R.string.boggart_apply)) }
+                Button(onClick = { onIntent(RuleEditIntent.Save) }, enabled = canSave) { Text(stringResource(R.string.boggart_save)) }
+            }
+            RuleOrigin.Saved -> Button(onClick = { onIntent(RuleEditIntent.Save) }) { Text(stringResource(R.string.boggart_save)) }
+            RuleOrigin.Preset -> Unit
+        }
+    }
+}
+
+/** 프리셋 순차 응답의 단계 목록. 프리셋은 고칠 수 없어 읽기 전용 요약과 다음 차례, 처음으로 되돌리기만 둔다. */
+@Composable
+private fun ColumnScope.PresetSequenceSteps(sequence: Override.Sequence, nextStep: Int?, onRestart: () -> Unit) {
+    sequence.steps.forEachIndexed { index, step ->
+        val isNext = index == nextStep
+        Text(
+            stringResource(R.string.boggart_sequence_step, index + 1, stepSentence(step)) +
+                if (isNext) " · " + stringResource(R.string.boggart_sequence_next_marker) else "",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isNext) FontWeight.Bold else null,
+            modifier = Modifier.padding(vertical = 2.dp),
+        )
+    }
+    if (nextStep != null && nextStep >= sequence.steps.size) {
+        Text(stringResource(R.string.boggart_sequence_used_up_full), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+    }
+    Text("${stringResource(R.string.boggart_sequence_then)}: ${sequence.then.label()}", style = MaterialTheme.typography.bodyMedium)
+    SequenceRestart(nextStep, onRestart)
+}
+
+/** 순차 응답이 아닌 규칙의 조작 입력. 확률 조작 규칙은 안쪽 조작과 확률을 함께 고친다. */
+@Composable
+private fun ColumnScope.SingleOverrideFields(override: Override, form: RuleForm, edit: (RuleForm) -> Unit, onIntent: (RuleEditIntent) -> Unit) {
     SectionTitle(overrideLabel(override))
     when (override) {
         is Override.Replace -> {
@@ -191,61 +244,19 @@ private fun ColumnScope.RuleFormFields(
             InvalidCheckbox(form.ignoreInvalid) { edit(form.copy(ignoreInvalid = it)) }
         }
         is Override.Fail -> FailKindPicker(form.failKind, form.customMessage, { edit(form.copy(failKind = it)) }, { edit(form.copy(customMessage = it)) })
-        is Override.Sequence -> {
-            SequenceSteps(override, nextStep, editable = true) { onIntent(RuleEditIntent.RestartSequence) }
-            Text(stringResource(R.string.boggart_sequence_then), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
-            ChoiceRow(SequenceEnd.entries, form.then, { it.label() }) { edit(form.copy(then = it)) }
-        }
+        // 확률 조작 규칙은 단계 입력 하나로 고친다(반복 횟수 없음). 지연은 안쪽 조작의 것이다.
         is Override.Chance -> {
-            Text(overrideSentence(override), style = MaterialTheme.typography.bodyMedium)
-            Text(stringResource(R.string.boggart_chance_readonly), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+            StepFields(form.steps.single(), showTimes = false) { onIntent(RuleEditIntent.EditStep(0, it)) }
+            return
         }
+        is Override.Sequence -> return
     }
-    // 순차 응답은 단계마다, 확률 조작은 안의 조작이 지연을 따로 둔다.
-    if (override !is Override.Sequence && override !is Override.Chance) DelayPicker(form.delay) { edit(form.copy(delay = it)) }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        when (origin) {
-            RuleOrigin.Temporary -> {
-                OutlinedButton(onClick = { onIntent(RuleEditIntent.Apply) }) { Text(stringResource(R.string.boggart_apply)) }
-                Button(onClick = { onIntent(RuleEditIntent.Save) }, enabled = canSave) { Text(stringResource(R.string.boggart_save)) }
-            }
-            RuleOrigin.Saved -> Button(onClick = { onIntent(RuleEditIntent.Save) }) { Text(stringResource(R.string.boggart_save)) }
-            RuleOrigin.Preset -> Unit
-        }
-    }
+    DelayPicker(form.delay) { edit(form.copy(delay = it)) }
 }
 
-/**
- * 순차 응답의 단계 목록. 단계는 rules.json·원격 제어에서 고치므로 읽기 전용 요약으로 보여 주고,
- * 다음 차례를 표시하고 처음부터 다시 시작할 수 있게 한다.
- *
- * @param editable 임시·저장 규칙이면 true. 마지막 뒤 동작은 아래 선택지로 보이므로 여기서는 프리셋일 때만 쓴다.
- */
+/** 순차 응답을 처음부터 다시 시작하는 버튼. 이미 처음이면 끈다. */
 @Composable
-private fun ColumnScope.SequenceSteps(sequence: Override.Sequence, nextStep: Int?, editable: Boolean, onRestart: () -> Unit) {
-    sequence.steps.forEachIndexed { index, step ->
-        val isNext = index == nextStep
-        Text(
-            stringResource(R.string.boggart_sequence_step, index + 1, stepSentence(step)) +
-                if (isNext) " · " + stringResource(R.string.boggart_sequence_next_marker) else "",
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            fontWeight = if (isNext) FontWeight.Bold else null,
-            modifier = Modifier.padding(vertical = 2.dp),
-        )
-    }
-    if (nextStep != null && nextStep >= sequence.steps.size) {
-        Text(stringResource(R.string.boggart_sequence_used_up_full), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-    }
-    if (editable) {
-        Text(stringResource(R.string.boggart_sequence_readonly), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
-    } else {
-        Text("${stringResource(R.string.boggart_sequence_then)}: ${sequence.then.label()}", style = MaterialTheme.typography.bodyMedium)
-    }
+private fun SequenceRestart(nextStep: Int?, onRestart: () -> Unit) {
     OutlinedButton(onClick = onRestart, enabled = nextStep != 0, modifier = Modifier.padding(top = 4.dp)) {
         Text(stringResource(R.string.boggart_sequence_restart))
     }
@@ -256,7 +267,7 @@ private fun ColumnScope.SequenceSteps(sequence: Override.Sequence, nextStep: Int
  * 저장된 규칙은 앱을 다시 시작해도 남는 규칙이라 한 번 더 묻고, 임시 규칙은 목록처럼 바로 지운다.
  */
 @Composable
-private fun RemoveMenu(origin: RuleOrigin, ruleName: String, onRemove: () -> Unit) {
+private fun RemoveMenu(origin: RuleOrigin, ruleName: String, onConvert: (() -> Unit)?, onRemove: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
     Box {
@@ -264,6 +275,12 @@ private fun RemoveMenu(origin: RuleOrigin, ruleName: String, onRemove: () -> Uni
             Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.boggart_more))
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            onConvert?.let { convert ->
+                DropdownMenuItem(text = { Text(stringResource(R.string.boggart_convert_to_sequence)) }, onClick = {
+                    menuOpen = false
+                    convert()
+                })
+            }
             DropdownMenuItem(text = { Text(stringResource(R.string.boggart_remove)) }, onClick = {
                 menuOpen = false
                 if (origin == RuleOrigin.Saved) confirm = true else onRemove()
@@ -291,7 +308,7 @@ private fun RemoveMenu(origin: RuleOrigin, ruleName: String, onRemove: () -> Uni
  * 앱이 스키마 검사 같은 `BodyValidator`를 지정했을 때만 의미가 있는 고급 설정이다.
  */
 @Composable
-private fun InvalidCheckbox(checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun InvalidCheckbox(checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = checked, onCheckedChange = onChange)
         Text(stringResource(R.string.boggart_ignore_invalid))

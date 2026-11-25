@@ -165,4 +165,21 @@ class CallDetailViewModelTest {
         assertTrue(state.targetIsComposite)
         assertEquals(R.string.boggart_switch_to_error, state.submitButton)
     }
+
+    @Test
+    fun `the drafted override can be appended to the sequence being edited`() = runTest {
+        val sequence = Override.Sequence(listOf(SequenceStep(Override.Replace(status = 500))))
+        val store = FakeBoggartStore(listOf(jsonExchange(appliedRuleId = "seq").copy(step = 0)))
+        store.upsert(RuleTarget.Temporary("seq"), rule("seq", sequence))
+        val vm = CallDetailViewModel(1, store)
+        assertTrue(vm.state.value.canAppendStep)
+        vm.onIntent(CallDetailIntent.Edit(vm.state.value.editor.copy(status = "200", bodyText = "[]")))
+        vm.onIntent(CallDetailIntent.AppendStep)
+        assertEquals(UiEffect.ReturnToApp(UiMessage(R.string.boggart_step_appended, listOf(2))), vm.effects.first())
+        val updated = store.currentRules().temporary.single()
+        assertEquals("seq", updated.id)
+        val steps = (updated.override as Override.Sequence).steps
+        assertEquals(2, steps.size)
+        assertEquals(200, (steps[1].override as Override.Replace).status)
+    }
 }

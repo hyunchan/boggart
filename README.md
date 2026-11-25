@@ -258,7 +258,7 @@ A `sequence` override answers successive matching calls with its steps in turn: 
 - **What counts.** Every call the rule matches moves it on, whatever the app does with the response. Calls in paused or off mode don't count.
 - **Starting over.** The position is kept in memory. It starts over when the app restarts, when the rule is changed or switched off and on, when you tap **Reset to the first** in the rule editor, and on `riddikulus`, `POST /reset` or putting the rule again over remote control.
 - **One position per rule.** With a broad path such as `/users/*`, all matching calls share it.
-- **In the app.** The rule list shows which response is next, and a call shows which response it got (`step` in remote control, counted from 0). The rule editor shows the steps and what happens after the last one, but the steps themselves are changed in `rules.json` or over remote control.
+- **In the app.** The rule list shows which response is next, and a call shows which response it got (`step` in remote control, counted from 0). In the rule editor, tap a step to edit it, including its repeat count and chance; the ⋮ menu moves, duplicates or removes it, and **Add step** adds a stub response or a network error. To build a sequence from scratch, open a rule and choose **Turn into a sequence** from the ⋮ menu. On a call answered by a sequence, **Add as a sequence step** in the ⋮ menu appends what you've set up to the end of that sequence.
 
 ### Failing some of the time
 

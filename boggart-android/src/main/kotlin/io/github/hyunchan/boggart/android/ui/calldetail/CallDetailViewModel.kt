@@ -6,11 +6,14 @@ import io.github.hyunchan.boggart.Exchange
 import io.github.hyunchan.boggart.FailKind
 import io.github.hyunchan.boggart.JsonPatchOp
 import io.github.hyunchan.boggart.Override
+import io.github.hyunchan.boggart.Rule
+import io.github.hyunchan.boggart.SequenceStep
 import io.github.hyunchan.boggart.android.R
 import io.github.hyunchan.boggart.android.ui.common.BoggartStore
 import io.github.hyunchan.boggart.android.ui.common.Draft
 import io.github.hyunchan.boggart.android.ui.common.RuleDrafts
 import io.github.hyunchan.boggart.android.ui.common.RuleSet
+import io.github.hyunchan.boggart.android.ui.common.RuleTarget
 import io.github.hyunchan.boggart.android.ui.common.UiEffect
 import io.github.hyunchan.boggart.android.ui.common.UiMessage
 import io.github.hyunchan.boggart.android.ui.common.ValueEdits
@@ -99,6 +102,8 @@ internal data class CallDetailState(
     val targetIsComposite: Boolean = false,
     /** 이 호출에 순차 응답 규칙이 적용됐으면 그 규칙의 단계 수. 단계 번호는 [Exchange.step]에 있다. */
     val appliedSequenceSize: Int? = null,
+    /** 고칠 대상이 순차 응답 규칙이라 지금 조작을 단계로 덧붙일 수 있는지. */
+    val canAppendStep: Boolean = false,
 ) {
     /**
      * 버튼 문구. 새 규칙이면 "… 규칙 만들기", 같은 종류의 규칙을 고치면 "규칙 고치기",
@@ -137,6 +142,9 @@ internal sealed interface CallDetailIntent {
     data class SetOps(val ops: List<JsonPatchOp>) : CallDetailIntent
     data class Edit(val editor: EditorFields) : CallDetailIntent
     data object Submit : CallDetailIntent
+
+    /** 지금 만든 조작을 고칠 대상인 순차 응답 규칙의 마지막 단계로 덧붙인다. */
+    data object AppendStep : CallDetailIntent
 }
 
 /** 화면의 입력 상태. 호출·규칙 같은 바깥 상태와 합쳐 [CallDetailState]가 된다. */
@@ -167,6 +175,7 @@ private data class Form(
             dirty = ops != savedOps || editor.contentDiffers(savedEditor),
             targetIsComposite = target is Override.Sequence || target is Override.Chance,
             appliedSequenceSize = (applied as? Override.Sequence)?.steps?.size?.takeIf { exchange?.step != null },
+            canAppendStep = target is Override.Sequence,
         )
     }
 
@@ -260,6 +269,7 @@ internal class CallDetailViewModel(
             is CallDetailIntent.SetOps -> form.update { it.copy(ops = intent.ops) }
             is CallDetailIntent.Edit -> form.update { it.copy(editor = intent.editor) }
             CallDetailIntent.Submit -> submit()
+            CallDetailIntent.AppendStep -> appendStep()
         }
     }
 
@@ -269,6 +279,43 @@ internal class CallDetailViewModel(
         val rules = store.currentRules()
         val target = rules.targetFor(current.targetRuleId)
         val updating = rules.isEditable(current.targetRuleId)
+        val rule = draft(current, exchange, target) ?: return
+        viewModelScope.launch {
+            runCatching { store.upsert(target, rule) }
+                .onSuccess {
+                    // 만든 시점의 입력이 새 기준이 된다(닫히기 전 뒤로 가기 확인이 뜨지 않게).
+                    form.update { it.copy(savedOps = current.ops, savedEditor = current.editor, targetRuleId = rule.id) }
+                    // 규칙은 다음 요청부터 적용되어 결과는 앱에서 다시 불러와야 보인다. 이 화면의 응답은 만들기 전 것이라 머물지 않고 앱으로 돌아간다.
+                    val done = if (updating) R.string.boggart_rule_updated else R.string.boggart_rule_applied
+                    // 토스트는 두 줄까지만 보여 규칙 이름은 넣지 않는다.
+                    effectChannel.send(UiEffect.ReturnToApp(UiMessage(done)))
+                }
+                .onFailure { effectChannel.send(UiEffect.Message(UiMessage(R.string.boggart_apply_failed, listOf(it.message.orEmpty())))) }
+        }
+    }
+
+    private fun appendStep() {
+        val current = form.value
+        val exchange = state.value.exchange ?: return
+        val rules = store.currentRules()
+        val existing = rules.find(current.targetRuleId)?.takeIf { rules.isEditable(current.targetRuleId) }?.second ?: return
+        val sequence = existing.override as? Override.Sequence ?: return
+        val target = rules.targetFor(existing.id)
+        val override = draft(current, exchange, target)?.override ?: return
+        // 기존 규칙의 조건·이름은 그대로 두고 단계만 덧붙인다.
+        val appended = existing.copy(override = sequence.copy(steps = sequence.steps + SequenceStep(override)))
+        viewModelScope.launch {
+            runCatching { store.upsert(target, appended) }
+                .onSuccess {
+                    form.update { it.copy(savedOps = current.ops, savedEditor = current.editor) }
+                    effectChannel.send(UiEffect.ReturnToApp(UiMessage(R.string.boggart_step_appended, listOf(sequence.steps.size + 1))))
+                }
+                .onFailure { effectChannel.send(UiEffect.Message(UiMessage(R.string.boggart_apply_failed, listOf(it.message.orEmpty())))) }
+        }
+    }
+
+    /** 지금 고른 조작과 입력으로 규칙을 만든다. 만들 수 없으면 이유를 알리고 null. */
+    private fun draft(current: Form, exchange: Exchange, target: RuleTarget): Rule? {
         val editor = current.editor
         val draft = when (state.value.kind) {
             RuleKind.Values -> ValueEdits.jsonPatchRule(exchange, current.ops, IGNORE_INVALID, editor.delay.toLongOrNull() ?: 0, target)
@@ -288,24 +335,12 @@ internal class CallDetailViewModel(
                 Draft.Ok(RuleDrafts.failRule(exchange, kind, editor.delay.toLongOrNull() ?: 0, target))
             }
         }
-        val rule = when (draft) {
+        return when (draft) {
             is Draft.Ok -> draft.rule
             is Draft.Error -> {
                 effectChannel.trySend(UiEffect.Message(UiMessage(draft.reason.messageRes())))
-                return
+                null
             }
-        }
-        viewModelScope.launch {
-            runCatching { store.upsert(target, rule) }
-                .onSuccess {
-                    // 만든 시점의 입력이 새 기준이 된다(닫히기 전 뒤로 가기 확인이 뜨지 않게).
-                    form.update { it.copy(savedOps = current.ops, savedEditor = current.editor, targetRuleId = rule.id) }
-                    // 규칙은 다음 요청부터 적용되어 결과는 앱에서 다시 불러와야 보인다. 이 화면의 응답은 만들기 전 것이라 머물지 않고 앱으로 돌아간다.
-                    val done = if (updating) R.string.boggart_rule_updated else R.string.boggart_rule_applied
-                    // 토스트는 두 줄까지만 보여 규칙 이름은 넣지 않는다.
-                    effectChannel.send(UiEffect.ReturnToApp(UiMessage(done)))
-                }
-                .onFailure { effectChannel.send(UiEffect.Message(UiMessage(R.string.boggart_apply_failed, listOf(it.message.orEmpty())))) }
         }
     }
 }
