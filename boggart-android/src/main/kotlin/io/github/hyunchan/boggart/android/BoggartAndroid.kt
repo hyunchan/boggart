@@ -172,8 +172,14 @@ public object BoggartAndroid {
             overlayController = (app as? Application)?.takeIf { config.overlay }?.let {
                 OverlayController(it, config.overlayWindowMs, config.overlayFilter, overlayPlacement(config)).apply { start() }
             }
-            controlServer?.stop()
-            controlServer = if (config.remoteControl) startControlServer(app.packageName) else null
+            // 서버는 규칙 저장소를 그때그때 읽으므로 다시 설치해도 그대로 쓴다. 닫고 바로 다시 열면
+            // 닫힌 소켓 이름이 아직 풀리지 않아 "Address already in use"로 실패한다.
+            if (!config.remoteControl) {
+                controlServer?.stop()
+                controlServer = null
+            } else if (controlServer == null) {
+                controlServer = startControlServer(app.packageName)
+            }
         }
     }
 
