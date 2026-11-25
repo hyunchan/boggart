@@ -72,6 +72,16 @@ internal class FakeBoggartStore(exchanges: List<Exchange> = emptyList()) : Bogga
 
     override suspend fun bodyText(rule: Rule): String = ""
 
+    /** 순차 응답 규칙 id → 다음 단계. 테스트가 직접 바꾼다. */
+    val progressState = MutableStateFlow<Map<String, Int>>(emptyMap())
+    override val sequenceProgress: Flow<Map<String, Int>> = progressState
+
+    override fun currentSequenceProgress(): Map<String, Int> = progressState.value
+
+    override fun resetSequence(ruleId: String) {
+        progressState.update { it + (ruleId to 0) }
+    }
+
     private fun List<Rule>.upsert(rule: Rule): List<Rule> {
         val index = indexOfFirst { it.id == rule.id }
         return if (index < 0) this + rule else toMutableList().also { it[index] = rule }

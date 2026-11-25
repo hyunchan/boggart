@@ -237,7 +237,7 @@ internal fun CallDetailContent(
             modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
         ) {
             // 규칙 만들기를 응답보다 위에 둔다. 응답 바디가 길어도 액션까지 스크롤하지 않게 한다.
-            CallNotes(exchange, state.appliedRuleName, state.matchingRuleCount, onOpenRule)
+            CallNotes(exchange, state.appliedRuleName, state.matchingRuleCount, state.appliedSequenceSize, onOpenRule)
             RuleEditor(exchange, state, onIntent)
             // 주소·요청 헤더·요청 바디는 가끔 확인하는 정보라 응답 위에 접어 둔다.
             RequestSection(exchange)
@@ -280,11 +280,21 @@ private fun CallSubtitle(exchange: Exchange) {
 
 /** 본문 맨 위에 남기는 것: 동작이 있는 적용된 규칙 링크와, 실패 원인처럼 놓치면 안 되는 오류 문구. */
 @Composable
-private fun ColumnScope.CallNotes(exchange: Exchange, appliedRuleName: String?, matchingRuleCount: Int, onOpenRule: (String) -> Unit) {
+private fun ColumnScope.CallNotes(
+    exchange: Exchange,
+    appliedRuleName: String?,
+    matchingRuleCount: Int,
+    sequenceSize: Int?,
+    onOpenRule: (String) -> Unit,
+) {
     val id = exchange.appliedRuleId
     if (id != null && appliedRuleName != null) {
         val name = appliedRuleName
         AssistChip(onClick = { onOpenRule(id) }, label = { Text(stringResource(R.string.boggart_applied_rule, name), maxLines = 1, overflow = TextOverflow.Ellipsis) })
+    }
+    val step = exchange.step
+    if (step != null && sequenceSize != null) {
+        Text(stringResource(R.string.boggart_sequence_call_step, step + 1, sequenceSize), style = MaterialTheme.typography.bodySmall)
     }
     // 같은 호출에 맞는 규칙이 여럿이면 하나만 적용되고 나머지는 가려진다. 규칙 목록의 "가려짐" 표시와 짝이다.
     if (matchingRuleCount > 1) {

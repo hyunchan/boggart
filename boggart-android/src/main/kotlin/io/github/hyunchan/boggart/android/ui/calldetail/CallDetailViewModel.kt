@@ -91,20 +91,27 @@ internal data class CallDetailState(
     val editor: EditorFields,
     /** 만들기 버튼이 기존 규칙을 고치는지. 이 화면에서 만든 규칙도 포함한다. */
     val updating: Boolean,
-    /** 고칠 기존 규칙의 종류. 고칠 규칙이 없으면 null. */
+    /** 고칠 기존 규칙의 종류. 고칠 규칙이 없거나 순차 응답이면 null. */
     val targetKind: RuleKind?,
     /** 규칙으로 만들지 않은 수정이 있는지. 나가기 전에 묻는다. */
     val dirty: Boolean,
+    /** 고칠 기존 규칙이 순차 응답인지. 만들면 단계 목록이 한 가지 조작으로 바뀐다. */
+    val targetIsSequence: Boolean = false,
+    /** 이 호출에 순차 응답 규칙이 적용됐으면 그 규칙의 단계 수. 단계 번호는 [Exchange.step]에 있다. */
+    val appliedSequenceSize: Int? = null,
 ) {
     /**
      * 버튼 문구. 새 규칙이면 "… 규칙 만들기", 같은 종류의 규칙을 고치면 "규칙 고치기",
      * 다른 종류의 규칙을 고치면 그 규칙의 조작이 바뀐다는 것이 드러나게 "…로 바꾸기".
      */
     @get:StringRes
-    val submitButton: Int get() = when (targetKind) {
-        null -> kind.button
-        kind -> R.string.boggart_update_rule
-        else -> kind.switchTo
+    val submitButton: Int get() = when {
+        targetIsSequence -> kind.switchTo
+        else -> when (targetKind) {
+            null -> kind.button
+            kind -> R.string.boggart_update_rule
+            else -> kind.switchTo
+        }
     }
 
     /** 지금 고른 조작으로 만들어질 규칙의 종류. */
@@ -143,8 +150,10 @@ private data class Form(
     /** 이 화면이 쓰는 규칙. 처음에는 호출에 적용됐던 규칙이고, 규칙을 만들면 그 규칙이 된다. */
     val targetRuleId: String?,
 ) {
-    fun toState(callId: Long, exchange: Exchange?, serverJson: JsonElement?, rules: RuleSet): CallDetailState =
-        CallDetailState(
+    fun toState(callId: Long, exchange: Exchange?, serverJson: JsonElement?, rules: RuleSet): CallDetailState {
+        val target = rules.find(targetRuleId)?.takeIf { rules.isEditable(targetRuleId) }?.second?.override
+        val applied = rules.find(exchange?.appliedRuleId)?.second?.override
+        return CallDetailState(
             callId = callId,
             exchange = exchange,
             appliedRuleName = exchange?.appliedRuleId?.let { id -> rules.find(id)?.second?.name ?: id },
@@ -154,9 +163,12 @@ private data class Form(
             ops = ops,
             editor = editor,
             updating = rules.isEditable(targetRuleId),
-            targetKind = rules.find(targetRuleId)?.takeIf { rules.isEditable(targetRuleId) }?.second?.override?.let(::kindOf),
+            targetKind = target?.let { kindOf(it) },
             dirty = ops != savedOps || editor.contentDiffers(savedEditor),
+            targetIsSequence = target is Override.Sequence,
+            appliedSequenceSize = (applied as? Override.Sequence)?.steps?.size?.takeIf { exchange?.step != null },
         )
+    }
 
     companion object {
         fun initial(exchange: Exchange?, rules: RuleSet): Form {
@@ -165,9 +177,13 @@ private data class Form(
             // 이미 만든 임시·저장 규칙을 이어서 고친다. 같은 호출에 규칙이 겹겹이 생기지 않게 한다.
             val existing = appliedId?.takeIf(rules::isEditable)?.let { rules.find(it)?.second }
                 ?: exchange?.let { rules.editableMatching(RuleDrafts.matcherFor(it.request)) }
-            val applied = existing ?: rules.find(appliedId)?.second
+            // 순차 응답이면 이 호출에 쓰인 단계에서 시작한다.
+            val applied = (existing ?: rules.find(appliedId)?.second)?.let { rule ->
+                val sequence = rule.override as? Override.Sequence ?: return@let rule
+                sequence.steps.getOrNull(exchange?.step ?: -1)?.let { rule.copy(override = it) }
+            }
             val ops = ValueEdits.initialOps(applied)
-            val appliedKind = applied?.override?.let(::kindOf)
+            val appliedKind = applied?.override?.let { kindOf(it) }
             val editor = EditorFields(
                 bodyText = exchange?.let(RuleDrafts::initialEditorText).orEmpty(),
                 status = (exchange?.deliveredResponse ?: exchange?.originalResponse)?.status?.toString() ?: "200",
@@ -186,11 +202,13 @@ private data class Form(
     }
 }
 
-private fun kindOf(override: Override): RuleKind = when (override) {
+/** 순차 응답은 한 가지 종류로 나타낼 수 없으므로 null. */
+private fun kindOf(override: Override): RuleKind? = when (override) {
     is Override.JsonPatch -> RuleKind.Values
     is Override.Patch -> RuleKind.Manual
     is Override.Replace -> RuleKind.Response
     is Override.Fail -> RuleKind.Error
+    is Override.Sequence -> null
 }
 
 private fun serverJsonOf(exchange: Exchange?): JsonElement? = exchange?.originalResponse?.body?.let(RuleDrafts::parseJson)

@@ -9,6 +9,7 @@ import io.github.hyunchan.boggart.Mode
 import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.Provenance
 import io.github.hyunchan.boggart.Rule
+import io.github.hyunchan.boggart.SequenceEnd
 import io.github.hyunchan.boggart.android.R
 
 /** 화면 문구를 리소스에서 고르는 곳. 순수 함수는 enum만 돌려주고 언어별 문구는 여기서 정한다. */
@@ -63,7 +64,17 @@ internal fun overrideLabel(override: Override): String = when (override) {
     is Override.Patch -> stringResource(R.string.boggart_override_manual)
     is Override.JsonPatch -> pluralStringResource(R.plurals.boggart_override_values, override.ops.size, override.ops.size)
     is Override.Fail -> stringResource(R.string.boggart_override_fail, failKindLabel(override.kind))
+    is Override.Sequence -> pluralStringResource(R.plurals.boggart_override_sequence, override.steps.size, override.steps.size)
 } + if (override.delayMs > 0) " +${override.delayMs}ms" else ""
+
+@Composable
+internal fun SequenceEnd.label(): String = stringResource(
+    when (this) {
+        SequenceEnd.Last -> R.string.boggart_sequence_then_last
+        SequenceEnd.Loop -> R.string.boggart_sequence_then_loop
+        SequenceEnd.Original -> R.string.boggart_sequence_then_original
+    },
+)
 
 @Composable
 internal fun matcherLabel(rule: Rule): String = with(rule.matcher) {
@@ -99,9 +110,12 @@ internal fun Mode.bannerRes(): Int? = when (this) {
     Mode.Off -> R.string.boggart_mode_off_banner
 }
 
-/** 규칙 목록 두 번째 줄. 규칙이 무엇을 하는지 문장으로 쓴다. 지연이 있으면 덧붙인다. */
+/**
+ * 규칙 목록 두 번째 줄. 규칙이 무엇을 하는지 문장으로 쓴다. 지연이 있으면 덧붙인다.
+ * 순차 응답이면 [nextStep](0부터)으로 다음 차례를 덧붙인다.
+ */
 @Composable
-internal fun overrideSentence(override: Override): String {
+internal fun overrideSentence(override: Override, nextStep: Int? = null): String {
     val main = when (override) {
         is Override.Replace -> stringResource(R.string.boggart_desc_replace, override.status)
         is Override.Patch -> stringResource(R.string.boggart_desc_manual)
@@ -111,6 +125,15 @@ internal fun overrideSentence(override: Override): String {
             FailKind.ConnectionReset -> stringResource(R.string.boggart_desc_fail_connection_reset)
             FailKind.UnknownHost -> stringResource(R.string.boggart_desc_fail_unknown_host)
             is FailKind.Custom -> stringResource(R.string.boggart_desc_fail_custom, kind.message)
+        }
+        is Override.Sequence -> {
+            val size = override.steps.size
+            val count = pluralStringResource(R.plurals.boggart_desc_sequence, size, size)
+            when {
+                nextStep == null -> count
+                nextStep < size -> count + " · " + stringResource(R.string.boggart_sequence_next, nextStep + 1)
+                else -> count + " · " + stringResource(R.string.boggart_sequence_used_up)
+            }
         }
     }
     return if (override.delayMs > 0) main + " · " + stringResource(R.string.boggart_desc_delay, override.delayMs) else main

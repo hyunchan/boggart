@@ -4,6 +4,7 @@ import io.github.hyunchan.boggart.Boggart
 import io.github.hyunchan.boggart.BoggartEngine
 import io.github.hyunchan.boggart.Exchange
 import io.github.hyunchan.boggart.Mode
+import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.RequestMatcher
 import io.github.hyunchan.boggart.Rule
 import io.github.hyunchan.boggart.RuleSource
@@ -86,8 +87,8 @@ public class BoggartControl(
             "reset",
             "POST",
             "/reset",
-            "Start a clean test: remove every temporary rule, clear captured calls, and set the mode to active. " +
-                "Saved rules and preset toggles stay.",
+            "Start a clean test: remove every temporary rule, clear captured calls, restart every sequence rule " +
+                "and set the mode to active. Saved rules and preset toggles stay.",
             tool = ControlTool("boggart_reset"),
         ) { reset() },
         ControlCommand(
@@ -156,7 +157,7 @@ public class BoggartControl(
             "PUT",
             "/rules/{id}",
             "Create or replace a rule by id. Applies from the next call. Without 'target', a rule that is already saved stays saved; " +
-                "anything else becomes a temporary rule.",
+                "anything else becomes a temporary rule. Putting a sequence rule again, even unchanged, restarts it from the first step.",
             params = listOf(
                 ID_PARAM,
                 ControlParam(
@@ -171,6 +172,7 @@ public class BoggartControl(
                 "boggart_put_rule",
                 bodyProperties = mapOf("rule" to RuleSchema.rule(withId = false)),
                 requiredBody = listOf("rule"),
+                defs = RuleSchema.defs,
             ) { it.getValue("rule") },
         ) { putRule(it) },
         ControlCommand(
@@ -208,6 +210,7 @@ public class BoggartControl(
                 "boggart_import_rules",
                 bodyProperties = mapOf("rules" to RuleSchema.rules()),
                 requiredBody = listOf("rules"),
+                defs = RuleSchema.defs,
             ) { args ->
                 buildJsonObject {
                     put("version", RulesDocument.CURRENT_VERSION)
@@ -342,6 +345,7 @@ public class BoggartControl(
     private fun reset(): JsonObject {
         temporaryRules.clear()
         log.clear()
+        engine.resetSequences()
         engine.mode = Mode.Active
         return status()
     }
@@ -410,16 +414,20 @@ public class BoggartControl(
         else -> null
     }
 
+    /** 순차 응답 규칙이면 진행 위치를 함께 싣는다. */
+    private fun ruleJson(rule: Rule, origin: String): JsonObject =
+        ControlJson.rule(rule, origin, engine.nextStep(rule).takeIf { rule.override is Override.Sequence })
+
     private fun listRules(call: ControlCall): JsonObject {
         val only = call.query["source"]?.let(::checkSource)
         val rules = sources().filter { only == null || it.first == only }
-            .flatMap { (origin, source) -> source.rules.value.map { ControlJson.rule(it, origin) } }
+            .flatMap { (origin, source) -> source.rules.value.map { ruleJson(it, origin) } }
         return buildJsonObject { put("rules", JsonArray(rules)) }
     }
 
     private fun getRule(call: ControlCall): JsonObject {
         val (origin, rule) = findRule(call)
-        return buildJsonObject { put("rule", ControlJson.rule(rule, origin)) }
+        return buildJsonObject { put("rule", ruleJson(rule, origin)) }
     }
 
     private suspend fun putRule(call: ControlCall): JsonObject {
@@ -427,16 +435,18 @@ public class BoggartControl(
         val body = call.jsonBody()
         (body["id"] as? JsonPrimitive)?.content?.let { if (it != id) throw badRequest("Body id '$it' doesn't match the path id '$id'.") }
         // GET으로 받은 규칙을 그대로 고쳐 보낼 수 있게 출력 전용 필드는 버린다.
-        val fields = JsonObject(body - "source" + ("id" to JsonPrimitive(id)))
+        val fields = JsonObject(body - "source" - "sequence" + ("id" to JsonPrimitive(id)))
         val rule = decodeRule(fields)
         val origin = call.query["target"]?.let(::checkTarget)
             ?: if (savedRules()?.source?.rules?.value?.any { it.id == id } == true) SAVED else TEMPORARY
         val store = editableStore(origin)
         val created = store.source.rules.value.none { it.id == id }
         store.upsert(rule)
+        // 같은 내용을 다시 넣으면 출처의 StateFlow가 기존 인스턴스를 유지하므로 커서를 직접 되돌린다.
+        engine.resetSequence(id)
         return buildJsonObject {
             put("created", created)
-            put("rule", ControlJson.rule(rule, origin))
+            put("rule", ruleJson(rule, origin))
         }
     }
 
@@ -449,7 +459,7 @@ public class BoggartControl(
         val store = store(origin) ?: throw readOnly("Rule '${rule.id}' comes from a source the app added; it can't be changed here.")
         store.setEnabled(rule.id, enabled)
         val updated = store.source.rules.value.firstOrNull { it.id == rule.id } ?: rule.copy(enabled = enabled)
-        return buildJsonObject { put("rule", ControlJson.rule(updated, origin)) }
+        return buildJsonObject { put("rule", ruleJson(updated, origin)) }
     }
 
     private suspend fun deleteRule(call: ControlCall): JsonObject {
@@ -457,7 +467,7 @@ public class BoggartControl(
         val store = store(origin)?.takeIf { it.editable }
             ?: throw readOnly("Rule '${rule.id}' is a $origin rule and can't be deleted. Turn it off with PATCH {\"enabled\": false}.")
         store.remove(rule.id)
-        return buildJsonObject { put("deleted", ControlJson.rule(rule, origin)) }
+        return buildJsonObject { put("deleted", ruleJson(rule, origin)) }
     }
 
     private suspend fun importRules(call: ControlCall): JsonObject {
@@ -479,7 +489,10 @@ public class BoggartControl(
         }
         val store = editableStore(origin)
         if (replace) store.clear()
-        document.rules.forEach { store.upsert(it) }
+        document.rules.forEach {
+            store.upsert(it)
+            engine.resetSequence(it.id)
+        }
         return buildJsonObject {
             put("imported", document.rules.size)
             put("target", origin)

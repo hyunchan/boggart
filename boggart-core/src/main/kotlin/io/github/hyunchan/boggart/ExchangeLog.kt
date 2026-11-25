@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * @property originalResponse 실제 서버 응답. 실제 호출이 없었으면(Replaced, Failed) null.
  * @property deliveredResponse 앱에 전달된 응답. 에러를 유발했거나(Failed) 실제 호출이 실패했으면 null.
  * @property error 실제 호출이 던진 예외의 `toString()`. 성공했으면 null.
+ * @property step [Override.Sequence] 규칙이 적용했을 때 쓴 단계(0부터). 순차 응답이 아니면 null.
  */
 public data class Exchange(
     val id: Long,
@@ -20,6 +21,7 @@ public data class Exchange(
     val provenance: Provenance,
     val appliedRuleId: String?,
     val error: String? = null,
+    val step: Int? = null,
 )
 
 /** 용량 제한 링 버퍼. [exchanges]는 오래된 것부터 시간순이다. */

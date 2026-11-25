@@ -72,6 +72,7 @@ internal fun RuleListScreen(
         preset = state.rules.preset,
         mode = state.mode,
         shadowedBy = state.shadowedBy,
+        sequenceProgress = state.sequenceProgress,
         snackbar = snackbar,
         onBack = onBack,
         onOpenRule = onOpenRule,
@@ -102,6 +103,7 @@ internal fun RuleListContent(
     onClearTemporary: () -> Unit,
     modifier: Modifier = Modifier,
     shadowedBy: Map<String, String> = emptyMap(),
+    sequenceProgress: Map<String, Int> = emptyMap(),
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     var confirmClear by remember { mutableStateOf(false) }
@@ -142,15 +144,15 @@ internal fun RuleListContent(
                     rules = temporary,
                     emptyText = temporaryEmpty,
                     action = if (temporary.isNotEmpty()) clearAll to { confirmClear = true } else null,
-                ) { rule -> RuleRow(rule, RuleOrigin.Temporary, showHost, canSave, shadowedBy[rule.id], onOpenRule, onToggle, onSave, onRemove) }
+                ) { rule -> RuleRow(rule, RuleOrigin.Temporary, showHost, canSave, shadowedBy[rule.id], sequenceProgress[rule.id], onOpenRule, onToggle, onSave, onRemove) }
                 if (!saved.isNullOrEmpty()) {
                     section(key = "saved", title = savedTitle, hint = savedHint, rules = saved) { rule ->
-                        RuleRow(rule, RuleOrigin.Saved, showHost, canSave, shadowedBy[rule.id], onOpenRule, onToggle, onSave, onRemove)
+                        RuleRow(rule, RuleOrigin.Saved, showHost, canSave, shadowedBy[rule.id], sequenceProgress[rule.id], onOpenRule, onToggle, onSave, onRemove)
                     }
                 }
                 if (preset != null) {
                     section(key = "preset", title = presetTitle, hint = presetHint, rules = preset, emptyText = presetEmpty) { rule ->
-                        RuleRow(rule, RuleOrigin.Preset, showHost, canSave, shadowedBy[rule.id], onOpenRule, onToggle, onSave, onRemove)
+                        RuleRow(rule, RuleOrigin.Preset, showHost, canSave, shadowedBy[rule.id], sequenceProgress[rule.id], onOpenRule, onToggle, onSave, onRemove)
                     }
                 }
             }
@@ -213,6 +215,7 @@ private fun RuleRow(
     showHost: Boolean,
     canSave: Boolean,
     shadowedBy: String?,
+    nextStep: Int?,
     onOpenRule: (String) -> Unit,
     onToggle: (RuleOrigin, Rule, Boolean) -> Unit,
     onSave: (Rule) -> Unit,
@@ -230,7 +233,7 @@ private fun RuleRow(
             Text(rule.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val host = rule.matcher.host?.takeIf { showHost }
             Text(
-                listOfNotNull(overrideSentence(rule.override), host).joinToString(" · "),
+                listOfNotNull(overrideSentence(rule.override, nextStep), host).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

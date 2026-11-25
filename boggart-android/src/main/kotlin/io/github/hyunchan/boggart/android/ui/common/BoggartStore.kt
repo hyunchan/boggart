@@ -95,7 +95,20 @@ internal interface BoggartStore {
     suspend fun remove(origin: RuleOrigin, ruleId: String)
     fun clearTemporary()
     suspend fun bodyText(rule: Rule): String
+
+    /** 순차 응답 규칙 id → 다음에 쓸 단계(0부터). 규칙이나 진행 위치가 바뀔 때마다 다시 낸다. */
+    val sequenceProgress: Flow<Map<String, Int>>
+
+    /** 지금의 [sequenceProgress]. ViewModel이 첫 상태를 동기로 만들 때 쓴다. */
+    fun currentSequenceProgress(): Map<String, Int>
+
+    /** 순차 응답 규칙을 처음부터 다시 시작하게 한다. */
+    fun resetSequence(ruleId: String)
 }
+
+/** [rules] 중 순차 응답 규칙의 다음 단계. id가 겹치면 엔진이 먼저 보는 규칙을 따른다. */
+internal fun sequenceProgressOf(rules: RuleSet, nextStep: (Rule) -> Int): Map<String, Int> =
+    rules.ordered.filter { it.override is Override.Sequence }.reversed().associate { it.id to nextStep(it) }
 
 /**
  * 전역 [Boggart]·[BoggartAndroid]에 연결된 기본 구현.
@@ -164,6 +177,15 @@ internal object GlobalBoggartStore : BoggartStore {
 
     override fun clearTemporary() {
         Boggart.riddikulus()
+    }
+
+    override val sequenceProgress: Flow<Map<String, Int>>
+        get() = combine(rules, Boggart.engine.sequenceCursors) { set, _ -> sequenceProgressOf(set, Boggart.engine::nextStep) }
+
+    override fun currentSequenceProgress(): Map<String, Int> = sequenceProgressOf(currentRules(), Boggart.engine::nextStep)
+
+    override fun resetSequence(ruleId: String) {
+        Boggart.engine.resetSequence(ruleId)
     }
 
     override suspend fun bodyText(rule: Rule): String {

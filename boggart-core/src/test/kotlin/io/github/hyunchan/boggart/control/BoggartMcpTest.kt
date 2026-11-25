@@ -11,6 +11,7 @@ import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.RequestMatcher
 import io.github.hyunchan.boggart.Rule
 import io.github.hyunchan.boggart.RuleRepository
+import io.github.hyunchan.boggart.SequenceEnd
 import io.github.hyunchan.boggart.TemporaryRuleSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -174,8 +175,16 @@ class BoggartMcpTest {
 
     private fun JsonObject.properties() = getValue("properties").jsonObject
 
+    /** 도구 입력 스키마 루트의 `$defs`. 규칙 스키마의 `$ref`를 풀 때 쓴다. */
+    private var defs: JsonObject = JsonObject(emptyMap())
+
+    private fun JsonObject.resolve(): JsonObject {
+        val ref = this["\$ref"]?.jsonPrimitive?.content ?: return this
+        return defs.getValue(ref.removePrefix("#/\$defs/")).jsonObject
+    }
+
     private fun JsonObject.variants() = getValue("oneOf").jsonArray.associate {
-        val variant = it.jsonObject
+        val variant = it.jsonObject.resolve()
         variant.properties().getValue("type").jsonObject.getValue("const").jsonPrimitive.content to variant
     }
 
@@ -186,7 +195,9 @@ class BoggartMcpTest {
 
     @Test
     fun `rule schema matches the serialized form`() = runTest {
-        val rule = schemaOf("boggart_import_rules").properties().getValue("rules").jsonObject.getValue("items").jsonObject
+        val tool = schemaOf("boggart_import_rules")
+        defs = tool.getValue("\$defs").jsonObject
+        val rule = tool.properties().getValue("rules").jsonObject.getValue("items").jsonObject
         assertEquals(Rule.serializer().descriptor.fields(), rule.properties().keys)
         assertEquals(serializer<RequestMatcher>().descriptor.fields(), rule.properties().getValue("matcher").jsonObject.properties().keys)
 
@@ -202,5 +213,11 @@ class BoggartMcpTest {
 
         val op = overrides.getValue("jsonPatch").properties().getValue("ops").jsonObject.getValue("items").jsonObject
         assertEquals(JsonPatchOp.serializer().descriptor.fields(), op.properties().keys)
+
+        val sequence = overrides.getValue("sequence").properties()
+        val steps = sequence.getValue("steps").jsonObject.getValue("items").jsonObject.variants()
+        assertEquals(overrideClasses.keys - "sequence", steps.keys)
+        val ends = SequenceEnd.serializer().descriptor.elementNames.toSet()
+        assertEquals(ends, sequence.getValue("then").jsonObject.getValue("enum").jsonArray.map { it.jsonPrimitive.content }.toSet())
     }
 }

@@ -38,13 +38,14 @@ public object Boggart {
         engine.repository.setSources(listOf(temporaryRules) + config.ruleSources.filterNot { it === temporaryRules })
     }
 
-    /** 모든 임시 규칙을 해제한다. 다른 출처(프리셋 등)의 규칙은 그대로다. */
+    /** 모든 임시 규칙을 해제하고 순차 응답을 모두 처음으로 되돌린다. 다른 출처(프리셋 등)의 규칙은 그대로다. */
     public fun riddikulus() {
         temporaryRules.clear()
+        engine.resetSequences()
     }
 
     /** 임시 규칙 [ruleId]를 해제한다. 없으면 false. */
-    public fun riddikulus(ruleId: String): Boolean = temporaryRules.remove(ruleId)
+    public fun riddikulus(ruleId: String): Boolean = temporaryRules.remove(ruleId).also { engine.resetSequence(ruleId) }
 }
 
 /** [Boggart.configure] DSL. */

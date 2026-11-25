@@ -7,6 +7,7 @@ import io.github.hyunchan.boggart.JsonPatchOp
 import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.RequestMatcher
 import io.github.hyunchan.boggart.Rule
+import io.github.hyunchan.boggart.SequenceEnd
 import io.github.hyunchan.boggart.android.ui.common.BoggartTheme
 import io.github.hyunchan.boggart.android.ui.common.RuleOrigin
 import kotlinx.serialization.json.JsonPrimitive
@@ -14,8 +15,8 @@ import kotlinx.serialization.json.JsonPrimitive
 private val PREVIEW_MATCHER = RequestMatcher("GET", "api.example.com", "/v1/articles")
 
 @Composable
-private fun RuleEditPreviewBody(origin: RuleOrigin, rule: Rule) {
-    BoggartTheme { RuleEditContent(RuleEditState(origin to rule, RuleForm.of(rule), canSave = true), onIntent = {}, onBack = {}) }
+private fun RuleEditPreviewBody(origin: RuleOrigin, rule: Rule, nextStep: Int? = null) {
+    BoggartTheme { RuleEditContent(RuleEditState(origin to rule, RuleForm.of(rule), canSave = true, nextStep), onIntent = {}, onBack = {}) }
 }
 
 @Preview(name = "규칙 편집 · 임시 · 빠른 편집", widthDp = 380, heightDp = 900)
@@ -48,4 +49,11 @@ private fun RuleEditPreviewFailDark() {
 @Composable
 private fun RuleEditPreviewPreset() {
     RuleEditPreviewBody(RuleOrigin.Preset, Rule("a1", "사용자 없음", RequestMatcher("GET", path = "/api/v1/users/*"), Override.Replace(404, bodyFile = "user-404.json", delayMs = 500), enabled = false))
+}
+
+@Preview(name = "규칙 편집 · 임시 · 순차 응답", widthDp = 380, heightDp = 900)
+@Composable
+private fun RuleEditPreviewSequence() {
+    val steps = listOf(Override.Fail(FailKind.Timeout, delayMs = 1000), Override.Replace(500), Override.Replace(200, body = "[]"))
+    RuleEditPreviewBody(RuleOrigin.Temporary, Rule("t3", "GET /v1/articles 재시도", PREVIEW_MATCHER, Override.Sequence(steps, SequenceEnd.Original)), nextStep = 1)
 }

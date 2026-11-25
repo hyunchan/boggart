@@ -40,6 +40,7 @@ A boggart is a creature from British folklore; in Harry Potter it takes the shap
 - [Managing rules](#managing-rules)
 - [QA recipes](#qa-recipes)
 - [Presets: shipping scenarios with the build](#presets-shipping-scenarios-with-the-build)
+- [Sequences: responses in turn](#sequences-responses-in-turn)
 - [Controlling Boggart from the command line](#controlling-boggart-from-the-command-line)
 - [Configuration](#configuration)
 - [Release builds](#release-builds)
@@ -157,6 +158,7 @@ Rules come from three places.
 | A timeout | Stub response → Network error → Timeout |
 | No network | Mode → Offline |
 | A slow response | Any rule, with a delay |
+| A retry after a failure | A [sequence](#sequences-responses-in-turn) rule: 500, then the real response |
 
 The [sample app](#sample-app) ships a preset for most of these.
 
@@ -216,16 +218,45 @@ src/debug/assets/boggart/bodies/user-404.json
 | `matcher.path` | Path glob. `*` matches one segment, `**` zero or more. A trailing slash doesn't matter |
 | `matcher.method` / `host` | Case-insensitive. Leave out to match any |
 | `matcher.query` / `headers` | `{"name": "value"}`. A value of `*` only checks that it's present |
-| `override.type` | `jsonPatch` (quick edit) / `patch` (manual edit) / `replace` (return a response) / `fail` (network error) |
+| `override.type` | `jsonPatch` (quick edit) / `patch` (manual edit) / `replace` (return a response) / `fail` (network error) / `sequence` (responses in turn, see [Sequences](#sequences-responses-in-turn)) |
 | `override.ops` (`jsonPatch`) | Array of `{"op": "add" \| "remove" \| "replace", "path": "/0/title", "value": …}` (JSON Patch, RFC 6902). Paths are JSON Pointers (RFC 6901). If any op can't be applied, the whole patch is dropped and the original is delivered |
 | `override.patch` (`patch`) | The fields to change (JSON Merge Patch, RFC 7396). A `null` value removes the field; arrays are replaced whole |
 | `override.status` / `headers` / `body` / `bodyFile` (`replace`) | The response to return. `bodyFile` is a file name under `bodies/` and can't be combined with `body` |
 | `override.kind.type` (`fail`) | `timeout` / `connectionReset` / `unknownHost` / `custom` (with `message`) |
-| `override.delayMs` | Optional delay for any override |
+| `override.delayMs` | Optional delay for any override. In a `sequence`, each step has its own |
+| `override.steps` / `then` (`sequence`) | The steps in order, and what happens after the last one: `last` / `loop` / `original` |
 
 A preset with `"enabled": true` is on for everyone who installs the build, so keep presets at `false` and switch them on in the app. Boggart remembers which ones you switched on.
 
 Presets and saved rules apply from the app's very first request. Boggart reads them when the app starts, and a request made before they're ready waits for them, for up to 0.5 seconds.
+
+## Sequences: responses in turn
+
+A `sequence` override answers successive matching calls with its steps in turn: the first call gets the first step, the next call the second, and so on. Use it to check retries, token refresh and back-off.
+
+```json
+{
+  "id": "user-retry",
+  "name": "User: 500, then a timeout, then the real response",
+  "matcher": { "method": "GET", "path": "/api/v1/users/*" },
+  "override": {
+    "type": "sequence",
+    "steps": [
+      { "type": "replace", "status": 500 },
+      { "type": "fail", "kind": { "type": "timeout" }, "delayMs": 2000 }
+    ],
+    "then": "original"
+  },
+  "enabled": false
+}
+```
+
+- **Steps.** Each step is any other override (`replace`, `patch`, `jsonPatch` or `fail`) with its own `delayMs`. To send a response more than once, list it again.
+- **After the last step.** `then` is `last` (default, keep sending the last step), `loop` (start again from the first) or `original` (let calls reach the server). In offline mode, `original` fails like a call without a rule.
+- **What counts.** Every call the rule matches moves it on, whatever the app does with the response. Calls in paused or off mode don't count.
+- **Starting over.** The position is kept in memory. It starts over when the app restarts, when the rule is changed or switched off and on, when you tap **Reset to the first** in the rule editor, and on `riddikulus`, `POST /reset` or putting the rule again over remote control.
+- **One position per rule.** With a broad path such as `/users/*`, all matching calls share it.
+- **In the app.** The rule list shows which response is next, and a call shows which response it got (`step` in remote control, counted from 0). The rule editor shows the steps and what happens after the last one, but the steps themselves are changed in `rules.json` or over remote control.
 
 ## Controlling Boggart from the command line
 
@@ -254,7 +285,7 @@ The exact `adb forward` line is also printed to logcat under the `Boggart` tag. 
 | `DELETE /rules/{id}` | Deletes a temporary or saved rule |
 | `POST /rules/import?target=&replace=` | Applies a whole rules document, e.g. one test scenario |
 | `GET /mode`, `PUT /mode` | `{"mode": "offline"}`. One of `active`, `paused`, `offline`, `off` |
-| `POST /reset` | Removes temporary rules, clears captured calls and sets the mode back to `active` |
+| `POST /reset` | Removes temporary rules, clears captured calls, starts sequences over and sets the mode back to `active` |
 
 A typical test step:
 
@@ -282,7 +313,7 @@ claude mcp add --transport http boggart http://localhost:8765/mcp
 
 Other clients that support Streamable HTTP servers take the same URL. The tools are `boggart_status`, `boggart_set_mode`, `boggart_reset`, `boggart_list_calls`, `boggart_get_call`, `boggart_wait_for_call`, `boggart_list_rules`, `boggart_put_rule`, `boggart_set_rule_enabled`, `boggart_delete_rule` and `boggart_import_rules`. The server keeps no session, so it keeps working after the app restarts as long as the forward is in place. Run `adb forward` again after reconnecting the device.
 
-**Choosing between curl and MCP.** Agents that can run shell commands (such as Claude Code) and test scripts can use every feature with the curl commands above. MCP is useful in clients without a shell, or when you want inputs checked against the rule schema. The tool definitions, rule schema included, come to about 15 KB, and depending on the client they may stay in the session's context throughout.
+**Choosing between curl and MCP.** Agents that can run shell commands (such as Claude Code) and test scripts can use every feature with the curl commands above. MCP is useful in clients without a shell, or when you want inputs checked against the rule schema. The tool definitions, rule schema included, come to about 17 KB, and depending on the client they may stay in the session's context throughout.
 
 ## Configuration
 

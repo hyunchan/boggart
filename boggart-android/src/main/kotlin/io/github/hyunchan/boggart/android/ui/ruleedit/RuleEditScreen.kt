@@ -41,13 +41,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.Rule
+import io.github.hyunchan.boggart.SequenceEnd
 import io.github.hyunchan.boggart.android.R
 import io.github.hyunchan.boggart.android.ui.calldetail.FailKindPicker
 import io.github.hyunchan.boggart.android.ui.common.BackButton
+import io.github.hyunchan.boggart.android.ui.common.ChoiceRow
 import io.github.hyunchan.boggart.android.ui.common.CodeField
 import io.github.hyunchan.boggart.android.ui.common.CollectEffects
 import io.github.hyunchan.boggart.android.ui.common.DelayPicker
@@ -57,6 +60,7 @@ import io.github.hyunchan.boggart.android.ui.common.SectionTitle
 import io.github.hyunchan.boggart.android.ui.common.label
 import io.github.hyunchan.boggart.android.ui.common.matcherLabel
 import io.github.hyunchan.boggart.android.ui.common.overrideLabel
+import io.github.hyunchan.boggart.android.ui.common.overrideSentence
 import io.github.hyunchan.boggart.android.ui.common.storeViewModel
 
 /** 규칙 편집 화면. ViewModel을 만들고 상태 구독과 효과 처리만 맡는다. 그리기는 [RuleEditContent]가 한다. */
@@ -112,26 +116,35 @@ internal fun RuleEditContent(
         ) {
             Text(stringResource(R.string.boggart_rule_origin, origin.label(), rule.id), style = MaterialTheme.typography.labelSmall)
             if (origin == RuleOrigin.Preset) {
-                PresetRuleView(rule) { onIntent(RuleEditIntent.SetPresetEnabled(it)) }
+                PresetRuleView(rule, state.nextStep, { onIntent(RuleEditIntent.SetPresetEnabled(it)) }) { onIntent(RuleEditIntent.RestartSequence) }
             } else {
-                RuleFormFields(origin, rule, form, state.canSave, onIntent)
+                RuleFormFields(origin, rule, form, state.canSave, state.nextStep, onIntent)
             }
         }
     }
 }
 
 @Composable
-private fun ColumnScope.PresetRuleView(rule: Rule, onEnabledChange: (Boolean) -> Unit) {
+private fun ColumnScope.PresetRuleView(rule: Rule, nextStep: Int?, onEnabledChange: (Boolean) -> Unit, onRestart: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.boggart_enabled), modifier = Modifier.weight(1f))
         Switch(checked = rule.enabled, onCheckedChange = onEnabledChange)
     }
     Text("${overrideLabel(rule.override)} · ${matcherLabel(rule)}", style = MaterialTheme.typography.bodyMedium)
-    Text(stringResource(R.string.boggart_preset_readonly), style = MaterialTheme.typography.bodySmall)
+    val sequence = rule.override as? Override.Sequence
+    if (sequence != null) SequenceSteps(sequence, nextStep, editable = false, onRestart = onRestart)
+    Text(stringResource(R.string.boggart_preset_readonly), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
 }
 
 @Composable
-private fun ColumnScope.RuleFormFields(origin: RuleOrigin, rule: Rule, form: RuleForm, canSave: Boolean, onIntent: (RuleEditIntent) -> Unit) {
+private fun ColumnScope.RuleFormFields(
+    origin: RuleOrigin,
+    rule: Rule,
+    form: RuleForm,
+    canSave: Boolean,
+    nextStep: Int?,
+    onIntent: (RuleEditIntent) -> Unit,
+) {
     val override = rule.override
     val edit = { next: RuleForm -> onIntent(RuleEditIntent.Edit(next)) }
 
@@ -177,8 +190,14 @@ private fun ColumnScope.RuleFormFields(origin: RuleOrigin, rule: Rule, form: Rul
             InvalidCheckbox(form.ignoreInvalid) { edit(form.copy(ignoreInvalid = it)) }
         }
         is Override.Fail -> FailKindPicker(form.failKind, form.customMessage, { edit(form.copy(failKind = it)) }, { edit(form.copy(customMessage = it)) })
+        is Override.Sequence -> {
+            SequenceSteps(override, nextStep, editable = true) { onIntent(RuleEditIntent.RestartSequence) }
+            Text(stringResource(R.string.boggart_sequence_then), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+            ChoiceRow(SequenceEnd.entries, form.then, { it.label() }) { edit(form.copy(then = it)) }
+        }
     }
-    DelayPicker(form.delay) { edit(form.copy(delay = it)) }
+    // 순차 응답은 단계마다 지연을 따로 둔다.
+    if (override !is Override.Sequence) DelayPicker(form.delay) { edit(form.copy(delay = it)) }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -192,6 +211,38 @@ private fun ColumnScope.RuleFormFields(origin: RuleOrigin, rule: Rule, form: Rul
             RuleOrigin.Saved -> Button(onClick = { onIntent(RuleEditIntent.Save) }) { Text(stringResource(R.string.boggart_save)) }
             RuleOrigin.Preset -> Unit
         }
+    }
+}
+
+/**
+ * 순차 응답의 단계 목록. 단계는 rules.json·원격 제어에서 고치므로 읽기 전용 요약으로 보여 주고,
+ * 다음 차례를 표시하고 처음부터 다시 시작할 수 있게 한다.
+ *
+ * @param editable 임시·저장 규칙이면 true. 마지막 뒤 동작은 아래 선택지로 보이므로 여기서는 프리셋일 때만 쓴다.
+ */
+@Composable
+private fun ColumnScope.SequenceSteps(sequence: Override.Sequence, nextStep: Int?, editable: Boolean, onRestart: () -> Unit) {
+    sequence.steps.forEachIndexed { index, step ->
+        val isNext = index == nextStep
+        Text(
+            stringResource(R.string.boggart_sequence_step, index + 1, overrideSentence(step)) +
+                if (isNext) " · " + stringResource(R.string.boggart_sequence_next_marker) else "",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isNext) FontWeight.Bold else null,
+            modifier = Modifier.padding(vertical = 2.dp),
+        )
+    }
+    if (nextStep != null && nextStep >= sequence.steps.size) {
+        Text(stringResource(R.string.boggart_sequence_used_up_full), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+    }
+    if (editable) {
+        Text(stringResource(R.string.boggart_sequence_readonly), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+    } else {
+        Text("${stringResource(R.string.boggart_sequence_then)}: ${sequence.then.label()}", style = MaterialTheme.typography.bodyMedium)
+    }
+    OutlinedButton(onClick = onRestart, enabled = nextStep != 0, modifier = Modifier.padding(top = 4.dp)) {
+        Text(stringResource(R.string.boggart_sequence_restart))
     }
 }
 

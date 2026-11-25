@@ -138,4 +138,17 @@ class CallDetailViewModelTest {
         store.upsert(RuleTarget.Saved("b"), rule("b"))
         assertEquals(2, CallDetailViewModel(1, store).state.value.matchingRuleCount)
     }
+
+    @Test
+    fun `a call answered by a sequence starts from its step and offers to switch`() = runTest {
+        val sequence = Override.Sequence(listOf(Override.Replace(status = 500), Override.JsonPatch(listOf(replace("/0/title", "x")))))
+        val store = FakeBoggartStore(listOf(jsonExchange(appliedRuleId = "seq").copy(step = 1)))
+        store.upsert(RuleTarget.Temporary("seq"), rule("seq", sequence))
+        val state = CallDetailViewModel(1, store).state.value
+        assertEquals(Action.Values, state.action)
+        assertEquals(listOf(replace("/0/title", "x")), state.ops)
+        assertTrue(state.targetIsSequence)
+        assertEquals(2, state.appliedSequenceSize)
+        assertEquals(R.string.boggart_switch_to_values, state.submitButton)
+    }
 }

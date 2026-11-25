@@ -5,6 +5,7 @@ import io.github.hyunchan.boggart.FailKind
 import io.github.hyunchan.boggart.OnInvalidPatch
 import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.Rule
+import io.github.hyunchan.boggart.SequenceEnd
 import io.github.hyunchan.boggart.android.R
 import io.github.hyunchan.boggart.android.ui.common.BoggartStore
 import io.github.hyunchan.boggart.android.ui.common.Draft
@@ -43,6 +44,7 @@ internal data class RuleForm(
     val ignoreInvalid: Boolean,
     val failKind: FailKind,
     val customMessage: String,
+    val then: SequenceEnd = SequenceEnd.Last,
 ) {
     companion object {
         fun of(rule: Rule): RuleForm {
@@ -63,6 +65,7 @@ internal data class RuleForm(
                 ignoreInvalid = onInvalid != OnInvalidPatch.PassThrough,
                 failKind = (override as? Override.Fail)?.kind ?: FailKind.Timeout,
                 customMessage = ((override as? Override.Fail)?.kind as? FailKind.Custom)?.message ?: "Simulated by Boggart",
+                then = (override as? Override.Sequence)?.then ?: SequenceEnd.Last,
             )
         }
     }
@@ -71,16 +74,20 @@ internal data class RuleForm(
 /**
  * 규칙 편집 화면이 그리는 것. [found]가 null이면 해제된(또는 아직 읽지 않은) 규칙이다.
  * [form]은 규칙을 처음 찾았을 때 한 번 만들고, 이후 규칙이 바뀌어도(저장으로 출처가 바뀌는 등) 입력을 덮어쓰지 않는다.
+ *
+ * @property nextStep 순차 응답 규칙이면 다음에 보낼 단계(0부터). 아니면 null.
  */
 internal data class RuleEditState(
     val found: Pair<RuleOrigin, Rule>?,
     val form: RuleForm?,
     val canSave: Boolean,
+    val nextStep: Int? = null,
 ) {
     companion object {
-        fun of(rules: RuleSet, ruleId: String, form: RuleForm?): RuleEditState {
+        fun of(rules: RuleSet, ruleId: String, form: RuleForm?, progress: Map<String, Int> = emptyMap()): RuleEditState {
             val found = rules.find(ruleId)
-            return RuleEditState(found, form ?: found?.second?.let(RuleForm::of), canSave = rules.saved != null)
+            val nextStep = if (found?.second?.override is Override.Sequence) progress[ruleId] ?: 0 else null
+            return RuleEditState(found, form ?: found?.second?.let(RuleForm::of), canSave = rules.saved != null, nextStep)
         }
     }
 }
@@ -94,6 +101,9 @@ internal sealed interface RuleEditIntent {
     /** 임시 규칙이면 저장 규칙으로 옮기고, 저장 규칙이면 고쳐 저장한다. */
     data object Save : RuleEditIntent
     data object Remove : RuleEditIntent
+
+    /** 순차 응답을 처음부터 다시 시작한다. */
+    data object RestartSequence : RuleEditIntent
     data class SetPresetEnabled(val enabled: Boolean) : RuleEditIntent
 }
 
@@ -105,8 +115,9 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
     private val effectChannel = Channel<UiEffect>(Channel.BUFFERED)
     val effects: Flow<UiEffect> = effectChannel.receiveAsFlow()
 
-    val state: StateFlow<RuleEditState> = combine(store.rules, form, closing) { rules, f, last -> last ?: RuleEditState.of(rules, ruleId, f) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, RuleEditState.of(store.currentRules(), ruleId, null))
+    val state: StateFlow<RuleEditState> =
+        combine(store.rules, form, closing, store.sequenceProgress) { rules, f, last, progress -> last ?: RuleEditState.of(rules, ruleId, f, progress) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, RuleEditState.of(store.currentRules(), ruleId, null, store.currentSequenceProgress()))
 
     init {
         // 저장 규칙은 설치 뒤 비동기로 읽히므로 규칙이 나타나는 시점에 입력을 만든다.
@@ -145,6 +156,10 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
                 val done = if (origin == RuleOrigin.Temporary) R.string.boggart_riddikulus_done else R.string.boggart_removed_done
                 effectChannel.send(UiEffect.CloseWith(UiMessage(done)))
             }
+            RuleEditIntent.RestartSequence -> viewModelScope.launch {
+                store.resetSequence(rule.id)
+                effectChannel.send(UiEffect.Message(UiMessage(R.string.boggart_sequence_restarted)))
+            }
             is RuleEditIntent.SetPresetEnabled -> viewModelScope.launch { store.setEnabled(origin, rule, intent.enabled) }
         }
     }
@@ -166,7 +181,7 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
         val f = form.value ?: return null
         val delayMs = f.delay.toLongOrNull() ?: 0
         val base = RuleDrafts.editMatcher(rule, f.method, f.host, f.path, f.matchHeaders)
-        return when (rule.override) {
+        return when (val override = rule.override) {
             is Override.Replace -> Draft.Ok(
                 RuleDrafts.editReplace(base, f.status.toIntOrNull() ?: 200, f.responseHeaders, f.body.orEmpty(), f.shownBody.orEmpty(), delayMs),
             )
@@ -176,6 +191,8 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
                 val kind = if (f.failKind is FailKind.Custom) FailKind.Custom(f.customMessage) else f.failKind
                 Draft.Ok(RuleDrafts.editFail(base, kind, delayMs))
             }
+            // 단계는 화면에서 고치지 않는다(rules.json·원격 제어). 조건과 마지막 뒤 동작만 바꾼다.
+            is Override.Sequence -> Draft.Ok(base.copy(override = override.copy(then = f.then)))
         }
     }
 }

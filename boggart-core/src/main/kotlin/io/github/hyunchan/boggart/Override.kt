@@ -68,6 +68,27 @@ public sealed interface Override {
         }
     }
 
+    /**
+     * 매칭될 때마다 [steps]를 차례로 하나씩 적용한다. 다 쓰면 [then]을 따른다.
+     *
+     * 진행 위치(커서)는 규칙이 아니라 [BoggartEngine]이 메모리에 보관한다. 규칙을 고치거나 켜고 끄면 처음부터 다시 시작한다.
+     * 지연은 각 단계의 `delayMs`를 쓴다.
+     */
+    @Serializable
+    @SerialName("sequence")
+    public data class Sequence(
+        val steps: List<Override>,
+        val then: SequenceEnd = SequenceEnd.Last,
+    ) : Override {
+        /** 단계마다 자기 지연을 쓰므로 0. */
+        override val delayMs: Long get() = 0
+
+        init {
+            require(steps.isNotEmpty()) { "A sequence needs at least one step" }
+            require(steps.none { it is Sequence }) { "A sequence step can't be another sequence" }
+        }
+    }
+
     /** 실제 호출 없이 네트워크 에러를 유발한다. */
     @Serializable
     @SerialName("fail")
@@ -79,6 +100,22 @@ public sealed interface Override {
             require(delayMs >= 0) { "delayMs must be >= 0" }
         }
     }
+}
+
+/** [Override.Sequence]의 단계를 다 쓴 뒤의 동작. */
+@Serializable
+public enum class SequenceEnd {
+    /** 마지막 단계를 계속 쓴다. */
+    @SerialName("last")
+    Last,
+
+    /** 첫 단계부터 다시 쓴다. */
+    @SerialName("loop")
+    Loop,
+
+    /** 조작 없이 실제 서버로 보낸다. Offline 모드에서는 규칙 없는 호출처럼 실패한다. */
+    @SerialName("original")
+    Original,
 }
 
 /** 유발할 네트워크 에러 종류. 어댑터가 자기 라이브러리의 예외로 변환한다. */

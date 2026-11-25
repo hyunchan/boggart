@@ -18,10 +18,19 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** [shadowedBy]: 다른 규칙에 가려 적용될 일이 없는 규칙의 id → 먼저 적용되는 규칙의 이름. */
-internal data class RuleListState(val rules: RuleSet, val mode: Mode, val shadowedBy: Map<String, String> = emptyMap()) {
+/**
+ * @property shadowedBy 다른 규칙에 가려 적용될 일이 없는 규칙의 id → 먼저 적용되는 규칙의 이름.
+ * @property sequenceProgress 순차 응답 규칙 id → 다음 단계(0부터).
+ */
+internal data class RuleListState(
+    val rules: RuleSet,
+    val mode: Mode,
+    val shadowedBy: Map<String, String> = emptyMap(),
+    val sequenceProgress: Map<String, Int> = emptyMap(),
+) {
     companion object {
-        fun of(rules: RuleSet, mode: Mode): RuleListState = RuleListState(rules, mode, rules.shadowing().mapValues { it.value.name })
+        fun of(rules: RuleSet, mode: Mode, progress: Map<String, Int>): RuleListState =
+            RuleListState(rules, mode, rules.shadowing().mapValues { it.value.name }, progress)
     }
 }
 
@@ -37,8 +46,8 @@ internal class RuleListViewModel(private val store: BoggartStore) : ViewModel() 
     private val effectChannel = Channel<UiEffect>(Channel.BUFFERED)
     val effects: Flow<UiEffect> = effectChannel.receiveAsFlow()
 
-    val state: StateFlow<RuleListState> = combine(store.rules, store.mode, RuleListState::of)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, RuleListState.of(store.currentRules(), store.mode.value))
+    val state: StateFlow<RuleListState> = combine(store.rules, store.mode, store.sequenceProgress, RuleListState::of)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, RuleListState.of(store.currentRules(), store.mode.value, store.currentSequenceProgress()))
 
     fun onIntent(intent: RuleListIntent) {
         when (intent) {

@@ -275,4 +275,31 @@ class BoggartControlTest {
         capture("/a%20b")
         assertEquals(1, (ok("GET", "/calls?path=%2Fa%2520b").getValue("calls") as JsonArray).size)
     }
+
+    @Test
+    fun `sequence rules show their position and calls show the step`() = runTest {
+        val rule = """{"matcher":{"path":"/users/*"},"override":{"type":"sequence","steps":[{"type":"replace","status":500},{"type":"replace","status":200}]}}"""
+        ok("PUT", "/rules/retry", rule)
+        capture("/users/1")
+
+        val listed = ok("GET", "/rules?source=temporary").getValue("rules").jsonArray.single().jsonObject
+        val position = listed.getValue("sequence").jsonObject
+        assertEquals(1, position.getValue("next").jsonPrimitive.int)
+        assertEquals(2, position.getValue("total").jsonPrimitive.int)
+        val call = ok("GET", "/calls").getValue("calls").jsonArray.single().jsonObject
+        assertEquals(0, call.getValue("step").jsonPrimitive.int)
+        assertFalse("sequence" in ok("GET", "/rules?source=preset").getValue("rules").jsonArray.single().jsonObject)
+
+        // GET으로 받은 규칙을 그대로 다시 넣으면(출력 전용 sequence 포함) 처음부터 다시 시작한다.
+        ok("PUT", "/rules/retry", listed.toString())
+        assertEquals(0, ok("GET", "/rules/retry").getValue("rule").jsonObject.getValue("sequence").jsonObject.getValue("next").jsonPrimitive.int)
+    }
+
+    @Test
+    fun `reset starts saved sequence rules over`() = runTest {
+        ok("PUT", "/rules/retry?target=saved", """{"matcher":{"path":"/users/*"},"override":{"type":"sequence","steps":[{"type":"replace","status":500},{"type":"replace","status":200}]}}""")
+        capture("/users/1")
+        ok("POST", "/reset")
+        assertEquals(0, ok("GET", "/rules/retry").getValue("rule").jsonObject.getValue("sequence").jsonObject.getValue("next").jsonPrimitive.int)
+    }
 }

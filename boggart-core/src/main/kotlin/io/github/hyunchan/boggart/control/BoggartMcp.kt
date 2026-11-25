@@ -82,6 +82,7 @@ public class BoggartMcp(private val control: BoggartControl) {
         val required = command.params.filter { it.required }.map { it.name } + tool.requiredBody
         if (required.isNotEmpty()) putJsonArray("required") { required.forEach { add(JsonPrimitive(it)) } }
         put("additionalProperties", false)
+        if (tool.defs.isNotEmpty()) put("\$defs", JsonObject(tool.defs))
     }
 
     private suspend fun callTool(id: JsonElement, params: JsonObject): JsonObject {
@@ -176,6 +177,8 @@ public class BoggartMcp(private val control: BoggartControl) {
             Typical test step: boggart_status to read calls.lastId, put or enable a rule, trigger the screen in the app,
             then boggart_wait_for_call with since = that lastId to see what the app sent and received.
             Rules apply from the next call, so reload the screen after changing a rule.
+            A sequence override answers successive matching calls with its steps in turn (for example 500, then 200, to test a retry);
+            each captured call shows which step answered it.
             Call boggart_reset between tests. Temporary rules disappear on reset or app restart; use target = saved to keep one.
         """.trimIndent()
     }

@@ -87,11 +87,13 @@ public class ControlParam internal constructor(
  *
  * @property bodyProperties 바디로 보낼 입력. 이름 → JSON Schema.
  * @property toBody 도구 입력에서 요청 바디를 만든다. 기본은 [bodyProperties]에 해당하는 입력만 모은 객체.
+ * @property defs [bodyProperties]의 스키마가 `#/$defs/이름`으로 참조하는 정의. 입력 스키마 루트에 싣는다.
  */
 public class ControlTool internal constructor(
     public val name: String,
     public val bodyProperties: Map<String, JsonObject> = emptyMap(),
     public val requiredBody: List<String> = emptyList(),
+    internal val defs: Map<String, JsonObject> = emptyMap(),
     internal val toBody: ((JsonObject) -> JsonElement)? = null,
 )
 

@@ -164,6 +164,27 @@
     <string name="boggart_desc_fail_custom">“%1$s” 오류로 실패</string>
     <string name="boggart_desc_delay">%1$dms 지연</string>
 
+    <!-- 순차 응답 -->
+    <plurals name="boggart_override_sequence">
+        <item quantity="other">순차 응답 · %d개</item>
+    </plurals>
+    <plurals name="boggart_desc_sequence">
+        <item quantity="other">응답 %d개를 차례로 보냄</item>
+    </plurals>
+    <string name="boggart_sequence_next">다음은 %1$d번째</string>
+    <string name="boggart_sequence_used_up">모두 씀</string>
+    <string name="boggart_sequence_used_up_full">응답을 모두 썼습니다</string>
+    <string name="boggart_sequence_step">%1$d. %2$s</string>
+    <string name="boggart_sequence_next_marker">다음</string>
+    <string name="boggart_sequence_then">마지막 응답 뒤에는</string>
+    <string name="boggart_sequence_then_last">마지막 응답을 계속 보냄</string>
+    <string name="boggart_sequence_then_loop">처음부터 다시</string>
+    <string name="boggart_sequence_then_original">실제 서버로 보냄</string>
+    <string name="boggart_sequence_restart">처음으로 되돌리기</string>
+    <string name="boggart_sequence_restarted">다음 호출부터 첫 응답을 보냅니다</string>
+    <string name="boggart_sequence_readonly">응답 목록은 rules.json이나 원격 제어로 바꿀 수 있습니다.</string>
+    <string name="boggart_sequence_call_step">순차 응답 %2$d개 중 %1$d번째</string>
+
     <!-- 호출 상태 (배지 네 가지와 상세 설명) -->
     <string name="boggart_status_original">원본</string>
     <string name="boggart_status_changed">조작됨</string>

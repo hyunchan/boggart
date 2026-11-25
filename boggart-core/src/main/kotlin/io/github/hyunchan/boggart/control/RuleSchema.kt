@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -88,57 +90,86 @@ internal object RuleSchema {
         required = listOf("op", "path"),
     )
 
+    /**
+     * 규칙 스키마가 `$ref`로 가리키는 정의. 도구 입력 스키마 루트의 `$defs`에 싣는다.
+     * sequence를 뺀 조작은 바깥 조작과 sequence의 단계 양쪽에서 쓰이므로 한 번만 싣고 참조한다.
+     */
+    val defs: Map<String, JsonObject> get() = singleVariants
+
+    /** sequence를 뺀 조작(구분자 → 스키마). sequence의 단계로도 쓴다. */
+    private val singleVariants: Map<String, JsonObject> = listOf(
+        variant(
+            "replace",
+            "Answer without calling the server.",
+            mapOf(
+                "status" to typed("integer", "HTTP status. Defaults to 200."),
+                "headers" to describe(stringMap, "Response headers."),
+                "body" to string("Response body as text. Use either body or bodyFile."),
+                "bodyFile" to string("File name under assets/boggart/bodies/ to use as the body."),
+                "mediaType" to string("Content-Type. Defaults to application/json."),
+                "delayMs" to delayMs,
+            ),
+        ),
+        variant(
+            "patch",
+            "Call the server, then apply a JSON Merge Patch (RFC 7386) to its JSON body. Arrays are replaced whole.",
+            mapOf(
+                "patch" to describe(JsonObject(emptyMap()), "Merge patch document. null removes a key."),
+                "delayMs" to delayMs,
+                "onInvalid" to onInvalid,
+            ),
+            listOf("patch"),
+        ),
+        variant(
+            "jsonPatch",
+            "Call the server, then change values at given paths (RFC 6902) and keep the rest of the real body. " +
+                "If any operation can't be applied, the original body is delivered.",
+            mapOf(
+                "ops" to buildJsonObject {
+                    put("type", "array")
+                    put("items", jsonPatchOp)
+                },
+                "delayMs" to delayMs,
+                "onInvalid" to onInvalid,
+            ),
+            listOf("ops"),
+        ),
+        variant(
+            "fail",
+            "Fail the call with a network error without calling the server.",
+            mapOf("kind" to failKind, "delayMs" to delayMs),
+            listOf("kind"),
+        ),
+    ).associateBy { it.getValue("properties").jsonObject.getValue("type").jsonObject.getValue("const").jsonPrimitive.content }
+
+    private val singleRefs: List<JsonObject> = singleVariants.keys.map { name -> buildJsonObject { put("\$ref", "#/\$defs/$name") } }
+
     private val override = buildJsonObject {
         put("description", "How to change the response. Pick one variant by 'type'.")
         putJsonArray("oneOf") {
+            singleRefs.forEach(::add)
             add(
                 variant(
-                    "replace",
-                    "Answer without calling the server.",
+                    "sequence",
+                    "Answer successive matching calls with 'steps' in turn: the first call gets the first step, the next call the second. " +
+                        "Each step has its own delayMs. Changing, re-enabling or putting the rule again starts over from the first step.",
                     mapOf(
-                        "status" to typed("integer", "HTTP status. Defaults to 200."),
-                        "headers" to describe(stringMap, "Response headers."),
-                        "body" to string("Response body as text. Use either body or bodyFile."),
-                        "bodyFile" to string("File name under assets/boggart/bodies/ to use as the body."),
-                        "mediaType" to string("Content-Type. Defaults to application/json."),
-                        "delayMs" to delayMs,
-                    ),
-                ),
-            )
-            add(
-                variant(
-                    "patch",
-                    "Call the server, then apply a JSON Merge Patch (RFC 7386) to its JSON body. Arrays are replaced whole.",
-                    mapOf(
-                        "patch" to describe(JsonObject(emptyMap()), "Merge patch document. null removes a key."),
-                        "delayMs" to delayMs,
-                        "onInvalid" to onInvalid,
-                    ),
-                    listOf("patch"),
-                ),
-            )
-            add(
-                variant(
-                    "jsonPatch",
-                    "Call the server, then change values at given paths (RFC 6902) and keep the rest of the real body. " +
-                        "If any operation can't be applied, the original body is delivered.",
-                    mapOf(
-                        "ops" to buildJsonObject {
+                        "steps" to buildJsonObject {
                             put("type", "array")
-                            put("items", jsonPatchOp)
+                            put("minItems", 1)
+                            put("description", "Steps in order. Repeat a step to use it more than once. A step can't be another sequence.")
+                            putJsonObject("items") {
+                                put("description", "One step: any override except sequence.")
+                                putJsonArray("oneOf") { singleRefs.forEach(::add) }
+                            }
                         },
-                        "delayMs" to delayMs,
-                        "onInvalid" to onInvalid,
+                        "then" to enumOf(
+                            listOf("last", "loop", "original"),
+                            "After the last step: last keeps using it, loop starts again from the first step, " +
+                                "original lets calls reach the server unchanged. Defaults to last.",
+                        ),
                     ),
-                    listOf("ops"),
-                ),
-            )
-            add(
-                variant(
-                    "fail",
-                    "Fail the call with a network error without calling the server.",
-                    mapOf("kind" to failKind, "delayMs" to delayMs),
-                    listOf("kind"),
+                    listOf("steps"),
                 ),
             )
         }

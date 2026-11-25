@@ -3,6 +3,7 @@ package io.github.hyunchan.boggart.control
 import io.github.hyunchan.boggart.BoggartHeaders
 import io.github.hyunchan.boggart.BoggartResponse
 import io.github.hyunchan.boggart.Exchange
+import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.Rule
 import io.github.hyunchan.boggart.StrictJson
 import kotlinx.serialization.json.Json
@@ -15,6 +16,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
@@ -33,7 +35,8 @@ internal object ControlJson {
         explicitNulls = false
     }
 
-    fun rule(rule: Rule, origin: String): JsonObject {
+    /** @param nextStep 순차 응답 규칙이면 다음에 쓸 단계(0부터). 출력 전용 `sequence` 필드로 싣는다. */
+    fun rule(rule: Rule, origin: String, nextStep: Int? = null): JsonObject {
         val fields = compact.encodeToJsonElement(Rule.serializer(), rule).jsonObject
         return buildJsonObject {
             put("source", origin)
@@ -41,6 +44,13 @@ internal object ControlJson {
             put("name", rule.name)
             put("enabled", rule.enabled)
             fields.forEach { (key, value) -> if (key !in RULE_FIXED_KEYS) put(key, value) }
+            val sequence = rule.override as? Override.Sequence
+            if (sequence != null && nextStep != null) {
+                putJsonObject("sequence") {
+                    put("next", nextStep)
+                    put("total", sequence.steps.size)
+                }
+            }
         }
     }
 
@@ -67,6 +77,7 @@ internal object ControlJson {
         put("status", exchange.deliveredResponse?.status)
         put("provenance", exchange.provenance.name.replaceFirstChar { it.lowercaseChar() })
         put("ruleId", exchange.appliedRuleId)
+        exchange.step?.let { put("step", it) }
         put("error", exchange.error)
     }
 

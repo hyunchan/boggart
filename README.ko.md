@@ -40,6 +40,7 @@ Boggart는 안드로이드 앱의 API 응답을 앱 안에서 실행 중에 바�
 - [규칙 관리](#규칙-관리)
 - [QA 시나리오 모음](#qa-시나리오-모음)
 - [프리셋: 빌드에 시나리오 싣기](#프리셋-빌드에-시나리오-싣기)
+- [순차 응답: 차례로 다른 응답 보내기](#순차-응답-차례로-다른-응답-보내기)
 - [명령줄로 제어하기](#명령줄로-제어하기)
 - [설정](#설정)
 - [release 빌드](#release-빌드)
@@ -157,6 +158,7 @@ debug 빌드를 실행하고 요청을 보내면 앱 위에 작은 버블이 떠
 | 타임아웃 | 서버 대신 응답 → 네트워크 에러 → 타임아웃 |
 | 네트워크 없음 | 모드 → 오프라인 |
 | 느린 응답 | 어떤 규칙에든 지연을 붙임 |
+| 실패 뒤 재시도 | [순차 응답](#순차-응답-차례로-다른-응답-보내기) 규칙: 500, 그다음 실제 응답 |
 
 [샘플 앱](#샘플-앱)에는 이 중 대부분이 프리셋으로 들어 있습니다.
 
@@ -216,16 +218,45 @@ src/debug/assets/boggart/bodies/user-404.json
 | `matcher.path` | 경로 글롭. `*`는 한 세그먼트, `**`는 0개 이상. 끝 슬래시는 구분하지 않습니다 |
 | `matcher.method` / `host` | 대소문자 무시. 비우면 모두 매칭 |
 | `matcher.query` / `headers` | `{"이름": "값"}`. 값이 `*`이면 존재만 검사 |
-| `override.type` | `jsonPatch`(빠른 편집) / `patch`(직접 편집) / `replace`(응답 돌려주기) / `fail`(네트워크 에러) |
+| `override.type` | `jsonPatch`(빠른 편집) / `patch`(직접 편집) / `replace`(응답 돌려주기) / `fail`(네트워크 에러) / `sequence`(순차 응답, [순차 응답](#순차-응답-차례로-다른-응답-보내기) 참고) |
 | `override.ops` (`jsonPatch`) | `{"op": "add" \| "remove" \| "replace", "path": "/0/title", "value": …}` 배열(JSON Patch, RFC 6902). 경로는 JSON Pointer(RFC 6901). 하나라도 적용할 수 없으면 패치 전체를 버리고 원본을 전달합니다 |
 | `override.patch` (`patch`) | 바꿀 필드만 적습니다(JSON Merge Patch, RFC 7396). 값이 `null`이면 그 필드를 지우고, 배열은 통째로 교체합니다 |
 | `override.status` / `headers` / `body` / `bodyFile` (`replace`) | 돌려줄 응답. `bodyFile`은 `bodies/` 아래 파일명이고 `body`와 함께 쓸 수 없습니다 |
 | `override.kind.type` (`fail`) | `timeout` / `connectionReset` / `unknownHost` / `custom`(`message`) |
-| `override.delayMs` | 어떤 규칙에나 붙일 수 있는 지연 |
+| `override.delayMs` | 어떤 규칙에나 붙일 수 있는 지연. `sequence`는 단계마다 따로 둡니다 |
+| `override.steps` / `then` (`sequence`) | 차례대로 적용할 단계와, 마지막 단계 뒤 동작: `last` / `loop` / `original` |
 
 `"enabled": true`인 프리셋은 그 빌드를 설치한 모두에게 처음부터 켜지므로, `false`로 두고 앱에서 켜기를 권장합니다. 켜고 끈 상태는 기억됩니다.
 
 프리셋과 저장 규칙은 앱의 첫 요청부터 적용됩니다. Boggart는 앱이 시작될 때 이 규칙들을 읽고, 다 읽기 전에 나간 요청은 최대 0.5초까지 기다립니다.
+
+## 순차 응답: 차례로 다른 응답 보내기
+
+`sequence` 조작은 규칙에 맞는 호출이 올 때마다 단계를 하나씩 차례로 적용합니다. 첫 호출은 첫 단계, 다음 호출은 두 번째 단계를 받습니다. 재시도, 토큰 갱신, 백오프 동작을 확인할 때 씁니다.
+
+```json
+{
+  "id": "user-retry",
+  "name": "사용자: 500, 타임아웃, 그다음 실제 응답",
+  "matcher": { "method": "GET", "path": "/api/v1/users/*" },
+  "override": {
+    "type": "sequence",
+    "steps": [
+      { "type": "replace", "status": 500 },
+      { "type": "fail", "kind": { "type": "timeout" }, "delayMs": 2000 }
+    ],
+    "then": "original"
+  },
+  "enabled": false
+}
+```
+
+- **단계.** 단계마다 다른 조작(`replace`, `patch`, `jsonPatch`, `fail`)을 하나씩 쓰고, 지연(`delayMs`)도 단계마다 따로 둡니다. 같은 응답을 여러 번 보내려면 그 단계를 여러 번 적습니다.
+- **마지막 단계 뒤.** `then`은 `last`(기본값, 마지막 단계를 계속 보냄), `loop`(처음부터 다시), `original`(실제 서버로 보냄) 중 하나입니다. 오프라인 모드에서 `original`은 규칙이 없는 호출처럼 실패합니다.
+- **세는 기준.** 앱이 응답을 어떻게 처리했는지와 상관없이, 규칙에 맞은 호출마다 한 단계씩 나아갑니다. 규칙 일시정지·끔 모드의 호출은 세지 않습니다.
+- **처음부터 다시.** 진행 위치는 메모리에만 있습니다. 앱을 다시 시작할 때, 규칙을 고치거나 껐다 켤 때, 규칙 편집 화면에서 **처음으로 되돌리기**를 누를 때, `riddikulus`·`POST /reset`을 부르거나 원격 제어로 규칙을 다시 넣을 때 처음부터 시작합니다.
+- **규칙 하나에 위치 하나.** `/users/*`처럼 넓은 경로를 쓰면 맞는 호출이 모두 같은 위치를 나눠 씁니다.
+- **화면에서.** 규칙 목록에 다음 차례가, 호출 상세에 그 호출이 받은 차례가 나옵니다(원격 제어에서는 0부터 세는 `step`). 규칙 편집 화면은 단계 목록과 마지막 단계 뒤 동작을 보여 주지만, 단계 자체는 `rules.json`이나 원격 제어로 바꿉니다.
 
 ## 명령줄로 제어하기
 
@@ -254,7 +285,7 @@ curl localhost:8765/status
 | `DELETE /rules/{id}` | 임시·저장 규칙 지우기 |
 | `POST /rules/import?target=&replace=` | 규칙 문서를 한 번에 적용(테스트 시나리오 단위) |
 | `GET /mode`, `PUT /mode` | `{"mode": "offline"}`. `active`·`paused`·`offline`·`off` 중 하나 |
-| `POST /reset` | 임시 규칙 해제, 캡처한 호출 비우기, 모드를 `active`로 |
+| `POST /reset` | 임시 규칙 해제, 캡처한 호출 비우기, 순차 응답 처음으로, 모드를 `active`로 |
 
 테스트 한 단계의 예:
 
@@ -282,7 +313,7 @@ claude mcp add --transport http boggart http://localhost:8765/mcp
 
 Streamable HTTP 서버를 지원하는 다른 클라이언트도 같은 주소를 씁니다. 도구는 `boggart_status`, `boggart_set_mode`, `boggart_reset`, `boggart_list_calls`, `boggart_get_call`, `boggart_wait_for_call`, `boggart_list_rules`, `boggart_put_rule`, `boggart_set_rule_enabled`, `boggart_delete_rule`, `boggart_import_rules`입니다. 서버가 세션을 두지 않으므로 forward가 살아 있는 한 앱이 재시작돼도 그대로 동작합니다. 기기를 다시 연결했다면 `adb forward`를 다시 실행합니다.
 
-**curl과 MCP 중 고르기.** 셸 명령을 실행할 수 있는 에이전트(Claude Code 등)나 테스트 스크립트라면 위의 curl 명령만으로 모든 기능을 쓸 수 있습니다. MCP는 셸이 없는 클라이언트에서 쓰거나, 규칙 스키마로 입력을 검증받고 싶을 때 유용합니다. 도구 정의는 규칙 스키마를 포함해 약 15KB이고, 클라이언트에 따라 이 정의가 세션 컨텍스트에 계속 실릴 수 있습니다.
+**curl과 MCP 중 고르기.** 셸 명령을 실행할 수 있는 에이전트(Claude Code 등)나 테스트 스크립트라면 위의 curl 명령만으로 모든 기능을 쓸 수 있습니다. MCP는 셸이 없는 클라이언트에서 쓰거나, 규칙 스키마로 입력을 검증받고 싶을 때 유용합니다. 도구 정의는 규칙 스키마를 포함해 약 17KB이고, 클라이언트에 따라 이 정의가 세션 컨텍스트에 계속 실릴 수 있습니다.
 
 ## 설정
 
