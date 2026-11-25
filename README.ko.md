@@ -65,10 +65,10 @@ Boggart는 Maven Central에 있고, 버전별 변경 사항은 [릴리스 노트
 
 ```kotlin
 dependencies {
-    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.4.0")
-    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.4.0") // OkHttp·Retrofit을 쓰면
-    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.4.0")   // Ktor를 쓰면
-    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.4.0")
+    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.5.0")
+    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.5.0") // OkHttp·Retrofit을 쓰면
+    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.5.0")   // Ktor를 쓰면
+    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.5.0")
 }
 ```
 

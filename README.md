@@ -65,10 +65,10 @@ Boggart is on Maven Central, and the [release notes](https://github.com/hyunchan
 
 ```kotlin
 dependencies {
-    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.4.0")
-    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.4.0") // if you use OkHttp or Retrofit
-    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.4.0")   // if you use Ktor
-    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.4.0")
+    debugImplementation("io.github.hyunchan.boggart:boggart-android:0.5.0")
+    debugImplementation("io.github.hyunchan.boggart:boggart-okhttp:0.5.0") // if you use OkHttp or Retrofit
+    debugImplementation("io.github.hyunchan.boggart:boggart-ktor:0.5.0")   // if you use Ktor
+    releaseImplementation("io.github.hyunchan.boggart:boggart-noop:0.5.0")
 }
 ```
 
