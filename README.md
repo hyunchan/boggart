@@ -388,6 +388,7 @@ Tap **Boggart** at the top right, open **Rules**, switch a preset on, then pull 
 - **Header matching differs by client.** With OkHttp, Boggart sees only the headers your app sets itself, not ones OkHttp adds later such as `Content-Type` or `User-Agent`. With Ktor it also sees headers added by plugins. Use header conditions for auth and custom headers.
 - **Ktor engine instances.** If you wrap an engine instance (`HttpClient(engine.withBoggart())`), the client won't close it, as is usual in Ktor. If you wrap the factory (`HttpClient(OkHttp.withBoggart())`), the client closes it.
 - **Bubble over dialogs.** The bubble isn't shown over dialogs or bottom sheets. Close them first, or open Boggart with `BoggartAndroid.openUi(context)`.
+- **Screens without content.** The bubble isn't attached to an activity that never calls `setContentView`, such as a login SDK's screen that only launches a Custom Tab. Calls made while it's open are still captured, and remote control keeps working.
 - **Streaming and very large responses.** `text/event-stream` responses, and responses larger than the body limit, can't be captured or edited. Stub responses still work for them.
 
 ## Licence

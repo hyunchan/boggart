@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import io.github.hyunchan.boggart.Boggart
@@ -27,6 +28,8 @@ import kotlinx.coroutines.launch
  * 시스템 오버레이 권한 없이, 화면에 올라온 Activity의 DecorView에 버블(ComposeView)을 붙인다.
  *
  * Resume 때 붙이고 Pause 때 뗀다. [BoggartActivity]와 `ComponentActivity`가 아닌 Activity에는 붙이지 않는다.
+ * `setContentView`를 부르지 않아 DecorView에 화면 수명 정보가 없는 Activity(커스텀 탭을 띄우고 바로 넘기는 화면 등)에도
+ * 붙이지 않는다. Compose는 창의 Recomposer를 만들 때 수명 정보를 DecorView에서 찾으므로, 붙이면 앱이 죽는다.
  * 버블 위치는 Activity가 바뀌어도 유지된다.
  */
 internal class OverlayController(
@@ -62,6 +65,8 @@ internal class OverlayController(
     override fun onActivityResumed(activity: Activity) {
         if (activity is BoggartActivity || activity !is ComponentActivity || activity in attached) return
         val decor = activity.window.decorView as? ViewGroup ?: return
+        // 다른 라이브러리의 화면을 고치지 않도록 수명 정보를 대신 넣지 않고 버블만 생략한다.
+        if (decor.findViewTreeLifecycleOwner() == null) return
         val view = ComposeView(activity).apply {
             setViewTreeLifecycleOwner(activity)
             setViewTreeSavedStateRegistryOwner(activity)

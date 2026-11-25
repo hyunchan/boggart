@@ -388,6 +388,7 @@ Boggart는 [App Startup](https://developer.android.com/topic/libraries/app-start
 - **헤더 매칭이 클라이언트마다 다릅니다.** OkHttp에서는 앱이 직접 넣은 헤더만 보이고, OkHttp가 나중에 붙이는 `Content-Type`·`User-Agent` 등은 보이지 않습니다. Ktor에서는 플러그인이 붙인 헤더까지 보입니다. 헤더 조건은 인증·커스텀 헤더에 쓰기를 권장합니다.
 - **Ktor 엔진 인스턴스.** 엔진 인스턴스를 감싸면(`HttpClient(engine.withBoggart())`) Ktor 관례대로 클라이언트가 엔진을 닫지 않습니다. 팩토리를 감싸면(`HttpClient(OkHttp.withBoggart())`) 클라이언트가 닫습니다.
 - **다이얼로그 위 버블.** 버블은 다이얼로그·바텀시트 위에는 보이지 않습니다. 닫은 뒤 누르거나 `BoggartAndroid.openUi(context)`로 여세요.
+- **내용이 없는 화면.** `setContentView`를 부르지 않는 Activity(커스텀 탭만 띄우는 로그인 SDK 화면 등)에는 버블을 붙이지 않습니다. 그 화면이 열려 있는 동안의 호출도 기록되고, 원격 제어도 그대로 동작합니다.
 - **스트리밍·대용량 응답.** `text/event-stream` 응답과 바디 한도를 넘는 응답은 캡처하거나 편집할 수 없습니다. 서버 대신 응답은 쓸 수 있습니다.
 
 ## 라이선스
