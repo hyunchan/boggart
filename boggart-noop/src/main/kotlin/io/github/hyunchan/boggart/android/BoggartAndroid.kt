@@ -20,6 +20,9 @@ public object BoggartAndroid {
         public var overlay: Boolean = true
         public var overlayWindowMs: Long = 2_000
         public var overlayFilter: (Activity) -> Boolean = { true }
+        public var overlayAnchor: OverlayAnchor = OverlayAnchor.TopEnd
+        public var overlayExtraHorizontalDp: Int = 0
+        public var overlayExtraVerticalDp: Int = 0
         public var remoteControl: Boolean = true
     }
 

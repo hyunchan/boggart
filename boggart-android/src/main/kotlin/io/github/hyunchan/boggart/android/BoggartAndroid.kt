@@ -11,6 +11,7 @@ import io.github.hyunchan.boggart.android.control.ControlServer
 import io.github.hyunchan.boggart.android.control.PresetControlStore
 import io.github.hyunchan.boggart.android.control.SavedControlStore
 import io.github.hyunchan.boggart.android.overlay.OverlayController
+import io.github.hyunchan.boggart.android.overlay.OverlayPlacement
 import io.github.hyunchan.boggart.control.BoggartControl
 import io.github.hyunchan.boggart.control.BoggartMcp
 import kotlinx.coroutines.CancellationException
@@ -49,6 +50,8 @@ public object BoggartAndroid {
     internal const val PRESET_OVERRIDES_FILE = "preset-overrides.json"
     internal const val SAVED_RULES_FILE = "saved-rules.json"
     private const val TAG = "Boggart"
+    private const val MAX_OVERLAY_EXTRA_HORIZONTAL_DP = 64
+    private const val MAX_OVERLAY_EXTRA_VERTICAL_DP = 96
     private const val CONTROL_SOCKET_PREFIX = "boggart-"
 
     public class Config internal constructor() {
@@ -81,6 +84,18 @@ public object BoggartAndroid {
          * 버블만 빠질 뿐 그 화면에서 나간 호출의 기록과 원격 제어는 그대로다.
          */
         public var overlayFilter: (Activity) -> Boolean = { true }
+
+        /** 버블이 처음 놓이는 귀퉁이. 기본은 위쪽 끝(툴바 아래, 하단 내비게이션에서 먼 곳). */
+        public var overlayAnchor: OverlayAnchor = OverlayAnchor.TopEnd
+
+        /**
+         * 앵커 쪽 가장자리에서 버블을 안쪽으로 더 띄우는 가로 거리(dp). 버블이 앱의 버튼을 가릴 때 비켜 놓는다.
+         * 0~64. 범위를 넘으면 가까운 끝값으로 맞추고 로그로 알린다.
+         */
+        public var overlayExtraHorizontalDp: Int = 0
+
+        /** [overlayExtraHorizontalDp]의 세로판. 위쪽 앵커면 아래로, 아래쪽 앵커면 위로 띄운다. 0~96. */
+        public var overlayExtraVerticalDp: Int = 0
 
         /**
          * false면 원격 제어를 열지 않는다. 켜져 있으면 `adb forward tcp:8765 localabstract:boggart-<applicationId>`로
@@ -154,10 +169,24 @@ public object BoggartAndroid {
         )
         synchronized(this) {
             overlayController?.stop()
-            overlayController = (app as? Application)?.takeIf { config.overlay }?.let { OverlayController(it, config.overlayWindowMs, config.overlayFilter).apply { start() } }
+            overlayController = (app as? Application)?.takeIf { config.overlay }?.let {
+                OverlayController(it, config.overlayWindowMs, config.overlayFilter, overlayPlacement(config)).apply { start() }
+            }
             controlServer?.stop()
             controlServer = if (config.remoteControl) startControlServer(app.packageName) else null
         }
+    }
+
+    /** 추가 마진을 허용 범위로 맞춘다. 버블이 화면 가운데로 가지 않게 상한을 둔다. */
+    private fun overlayPlacement(config: Config): OverlayPlacement {
+        fun clamp(name: String, value: Int, max: Int): Int = value.coerceIn(0, max).also {
+            if (it != value) Log.w(TAG, "$name must be 0..$max dp; using $it")
+        }
+        return OverlayPlacement(
+            config.overlayAnchor,
+            clamp("overlayExtraHorizontalDp", config.overlayExtraHorizontalDp, MAX_OVERLAY_EXTRA_HORIZONTAL_DP),
+            clamp("overlayExtraVerticalDp", config.overlayExtraVerticalDp, MAX_OVERLAY_EXTRA_VERTICAL_DP),
+        )
     }
 
     internal fun install(

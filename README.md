@@ -327,6 +327,9 @@ class App : Application() {
             mode = Mode.Active       // Active / Paused / Offline / Off
             overlay = true           // show the bubble
             overlayWindowMs = 2_000  // calls within this time of each other are counted on the bubble as one batch
+            overlayAnchor = OverlayAnchor.TopEnd  // corner the bubble starts in
+            overlayExtraHorizontalDp = 0          // move it further in from that corner, 0..64
+            overlayExtraVerticalDp = 0            // 0..96
             assetsDir = "boggart"    // assets/<assetsDir>/rules.json
             loadAssets = true        // load presets
             persistence = true       // keep saved rules and preset switches across restarts
@@ -336,6 +339,7 @@ class App : Application() {
 }
 ```
 
+- **Where the bubble sits.** The bubble starts 16 dp from the side and 30% of the way down the screen (or up, for a bottom corner), clear of toolbars and bottom navigation. If it covers something important, pick another corner with `overlayAnchor` (`TopStart`, `TopEnd`, `BottomStart`, `BottomEnd`) or move it further in with the extra margins. The margins are capped so the bubble never ends up in the middle; values outside the range are clamped and logged. Dragging the bubble still moves it anywhere.
 - **Screens without the bubble.** `overlayFilter` chooses the screens that get the bubble. To leave out screens from other libraries, such as a login or payment SDK, filter by your app's code package: `overlayFilter = { it.javaClass.name.startsWith("com.example.") }`. Calls and remote control keep working on those screens. By default every screen gets it, except ones that never call `setContentView`.
 - **Body size.** Bodies over 1 MiB aren't captured, and quick and manual edits aren't applied to them. Stub responses still work. Change the limit with `BoggartInterceptor(maxBodyBytes = …)` or `OkHttp.withBoggart(maxBodyBytes = …)`. Always pass it by name.
 - **Stricter validation.** By default an edited body only has to be valid JSON. To check it against your own schema, set a validator in debug code with `Boggart.configure { validator = BodyValidator { body, mediaType -> … } }`. `Boggart.configure` changes engine settings such as this one; installation settings stay in `BoggartAndroid.configure` above. In the rule editor, untick **Pass the original on if validation fails** to deliver bodies that fail it.

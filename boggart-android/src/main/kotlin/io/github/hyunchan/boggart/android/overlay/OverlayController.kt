@@ -37,6 +37,7 @@ internal class OverlayController(
     private val application: Application,
     windowMs: Long,
     private val filter: (Activity) -> Boolean = { true },
+    private val placement: OverlayPlacement = OverlayPlacement(),
 ) : Application.ActivityLifecycleCallbacks {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val coordinator = OverlayCoordinator(clock = System::currentTimeMillis, windowMs = windowMs)
@@ -78,6 +79,7 @@ internal class OverlayController(
                     OverlayBubble(
                         coordinator = coordinator,
                         position = position.value,
+                        placement = placement,
                         onPositionChange = { position.value = it },
                         onOpen = { target -> open(activity, target) },
                         onOpenRules = { activity.startActivity(BoggartActivity.intent(activity, Screen.Rules)) },

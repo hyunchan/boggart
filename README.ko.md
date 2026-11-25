@@ -327,6 +327,9 @@ class App : Application() {
             mode = Mode.Active       // Active / Paused / Offline / Off
             overlay = true           // 버블 표시
             overlayWindowMs = 2_000  // 이 시간 안에 이어진 호출을 한 묶음으로 세어 버블에 표시
+            overlayAnchor = OverlayAnchor.TopEnd  // 버블이 처음 놓이는 귀퉁이
+            overlayExtraHorizontalDp = 0          // 귀퉁이에서 안쪽으로 더 띄우기, 0~64
+            overlayExtraVerticalDp = 0            // 0~96
             assetsDir = "boggart"    // assets/<assetsDir>/rules.json
             loadAssets = true        // 프리셋 불러오기
             persistence = true       // 저장 규칙과 프리셋 켜짐 상태를 재시작 후에도 유지
@@ -336,6 +339,7 @@ class App : Application() {
 }
 ```
 
+- **버블 위치.** 버블은 옆 가장자리에서 16dp, 화면 위에서 30%(아래쪽 귀퉁이면 아래에서 30%) 지점에 처음 놓여 툴바와 하단 내비게이션을 비켜 갑니다. 앱의 중요한 요소를 가리면 `overlayAnchor`(`TopStart`, `TopEnd`, `BottomStart`, `BottomEnd`)로 다른 귀퉁이를 고르거나 추가 마진으로 안쪽에 더 띄웁니다. 버블이 화면 가운데로 가지 않도록 추가 마진에는 상한이 있고, 범위를 넘으면 가까운 끝값으로 맞추고 로그로 알립니다. 버블을 끌어서 옮기는 것은 그대로 됩니다.
 - **버블을 뺄 화면.** `overlayFilter`로 버블을 붙일 화면을 고릅니다. 로그인·결제 SDK처럼 다른 라이브러리의 화면을 빼려면 앱 코드의 패키지로 거릅니다: `overlayFilter = { it.javaClass.name.startsWith("com.example.") }`. 그 화면에서도 호출 기록과 원격 제어는 그대로입니다. 기본값은 모든 화면이고, `setContentView`를 부르지 않는 화면만 빠집니다.
 - **바디 크기.** 1 MiB를 넘는 바디는 캡처하지 않고 빠른 편집·직접 편집도 적용하지 않습니다. 서버 대신 응답은 그대로 적용됩니다. 한도는 `BoggartInterceptor(maxBodyBytes = …)`, `OkHttp.withBoggart(maxBodyBytes = …)`로 바꾸며, 항상 이름 있는 인자(named argument)로 넘깁니다.
 - **더 엄격한 검증.** 기본으로는 편집한 바디가 올바른 JSON이기만 하면 됩니다. 스키마로 검증하려면 debug 코드에서 `Boggart.configure { validator = BodyValidator { body, mediaType -> … } }`로 검증기를 지정합니다. `Boggart.configure`는 이런 엔진 설정을 바꾸고, 설치 설정은 위의 `BoggartAndroid.configure`에서 바꿉니다. 규칙 편집 화면에서 **검증에 실패하면 원본 전달**을 끄면 검증에 어긋난 바디도 그대로 전달합니다.

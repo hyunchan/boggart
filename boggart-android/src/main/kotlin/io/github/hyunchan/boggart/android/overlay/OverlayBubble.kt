@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -107,6 +108,7 @@ internal fun OverlayBubble(
     onPositionChange: (Offset) -> Unit,
     onOpen: (OverlayCoordinator.Target?) -> Unit,
     onOpenRules: () -> Unit,
+    placement: OverlayPlacement = OverlayPlacement(),
 ) {
     val bubble by coordinator.bubble.collectAsStateWithLifecycle()
     val activeRules by remember { Boggart.engine.repository.rules.map { rules -> rules.count { it.enabled } } }
@@ -123,7 +125,9 @@ internal fun OverlayBubble(
         var faceSize by remember { mutableStateOf(IntSize.Zero) }
         val maxX = (constraints.maxWidth - faceSize.width).toFloat().coerceAtLeast(0f)
         val maxY = (constraints.maxHeight - faceSize.height).toFloat().coerceAtLeast(0f)
-        val current = (position ?: Offset(maxX - with(density) { 16.dp.toPx() }, maxY * 0.3f))
+        val layoutDirection = LocalLayoutDirection.current
+        // 끌어 옮기기 전에는 앵커로 정한 자리에 둔다. 화면 크기가 바뀌어도 같은 귀퉁이를 지킨다.
+        val current = (position ?: with(density) { placement.offset(maxX, maxY, layoutDirection, this) })
             .let { Offset(it.x.coerceIn(0f, maxX), it.y.coerceIn(0f, maxY)) }
         // 드래그 제스처는 maxX·maxY가 바뀔 때만 다시 시작하므로 최신 위치를 따로 읽는다.
         val latest by rememberUpdatedState(current)
