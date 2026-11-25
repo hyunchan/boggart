@@ -178,7 +178,8 @@ public class BoggartMcp(private val control: BoggartControl) {
             then boggart_wait_for_call with since = that lastId to see what the app sent and received.
             Rules apply from the next call, so reload the screen after changing a rule.
             A sequence override answers successive matching calls with its steps in turn (for example 500, then 200, to test a retry);
-            each captured call shows which step answered it.
+            each captured call shows which step answered it. A step can be {times, override} to repeat it.
+            A chance override applies its override to some calls only (for example 30% timeouts); the rest reach the server.
             Call boggart_reset between tests. Temporary rules disappear on reset or app restart; use target = saved to keep one.
         """.trimIndent()
     }

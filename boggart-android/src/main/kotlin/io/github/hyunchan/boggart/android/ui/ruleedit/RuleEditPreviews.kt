@@ -8,6 +8,7 @@ import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.RequestMatcher
 import io.github.hyunchan.boggart.Rule
 import io.github.hyunchan.boggart.SequenceEnd
+import io.github.hyunchan.boggart.SequenceStep
 import io.github.hyunchan.boggart.android.ui.common.BoggartTheme
 import io.github.hyunchan.boggart.android.ui.common.RuleOrigin
 import kotlinx.serialization.json.JsonPrimitive
@@ -54,6 +55,10 @@ private fun RuleEditPreviewPreset() {
 @Preview(name = "규칙 편집 · 임시 · 순차 응답", widthDp = 380, heightDp = 900)
 @Composable
 private fun RuleEditPreviewSequence() {
-    val steps = listOf(Override.Fail(FailKind.Timeout, delayMs = 1000), Override.Replace(500), Override.Replace(200, body = "[]"))
+    val steps = listOf(
+        SequenceStep(Override.Chance(50, Override.Fail(FailKind.Timeout, delayMs = 1000))),
+        SequenceStep(Override.Replace(500), times = 2),
+        SequenceStep(Override.Replace(200, body = "[]")),
+    )
     RuleEditPreviewBody(RuleOrigin.Temporary, Rule("t3", "GET /v1/articles 재시도", PREVIEW_MATCHER, Override.Sequence(steps, SequenceEnd.Original)), nextStep = 1)
 }

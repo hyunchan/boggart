@@ -1,8 +1,16 @@
 package io.github.hyunchan.boggart
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonObject
 
 /** 규칙이 요청에 가하는 조작. JSON에서는 `type` 필드로 구분한다. */
 @Serializable
@@ -70,6 +78,7 @@ public sealed interface Override {
 
     /**
      * 매칭될 때마다 [steps]를 차례로 하나씩 적용한다. 다 쓰면 [then]을 따른다.
+     * 단계는 [SequenceStep.times]만큼 이어서 쓴다.
      *
      * 진행 위치(커서)는 규칙이 아니라 [BoggartEngine]이 메모리에 보관한다. 규칙을 고치거나 켜고 끄면 처음부터 다시 시작한다.
      * 지연은 각 단계의 `delayMs`를 쓴다.
@@ -77,15 +86,46 @@ public sealed interface Override {
     @Serializable
     @SerialName("sequence")
     public data class Sequence(
-        val steps: List<Override>,
+        val steps: List<SequenceStep>,
         val then: SequenceEnd = SequenceEnd.Last,
     ) : Override {
         /** 단계마다 자기 지연을 쓰므로 0. */
         override val delayMs: Long get() = 0
 
+        /** [then]을 따르기 전까지 쓰는 호출 수. 단계별 [SequenceStep.times]의 합. */
+        val calls: Int get() = steps.sumOf { it.times }
+
         init {
             require(steps.isNotEmpty()) { "A sequence needs at least one step" }
-            require(steps.none { it is Sequence }) { "A sequence step can't be another sequence" }
+        }
+
+        /** [call]번째(0부터) 호출이 쓰는 단계 번호. [calls] 이상이면 null. */
+        public fun stepAt(call: Int): Int? {
+            var remaining = call
+            steps.forEachIndexed { index, step ->
+                if (remaining < step.times) return index
+                remaining -= step.times
+            }
+            return null
+        }
+    }
+
+    /**
+     * 호출마다 [percent]% 확률로 [override]를 적용하고, 나머지는 조작 없이 실제 서버로 보낸다.
+     * 적용되지 않은 호출은 원본으로 기록하되 이 규칙의 id를 남긴다. 순차 응답의 단계로도 쓸 수 있다.
+     */
+    @Serializable
+    @SerialName("chance")
+    public data class Chance(
+        val percent: Int,
+        val override: Override,
+    ) : Override {
+        /** 걸렸을 때 [override]의 지연을 쓰므로 0. */
+        override val delayMs: Long get() = 0
+
+        init {
+            require(percent in 1..99) { "percent must be 1..99" }
+            require(override !is Sequence && override !is Chance) { "A chance can't wrap a sequence or another chance" }
         }
     }
 
@@ -98,6 +138,55 @@ public sealed interface Override {
     ) : Override {
         init {
             require(delayMs >= 0) { "delayMs must be >= 0" }
+        }
+    }
+}
+
+/**
+ * [Override.Sequence]의 단계 하나. [override]를 [times]번 이어서 쓴다.
+ *
+ * JSON에서는 조작만 쓰면 times 1이고(`{"type": "replace", …}`), 여러 번이면 `{"times": 3, "override": {…}}`로 감싼다.
+ */
+@Serializable(with = SequenceStepSerializer::class)
+public data class SequenceStep(
+    val override: Override,
+    val times: Int = 1,
+) {
+    init {
+        require(times in 1..MAX_TIMES) { "times must be 1..$MAX_TIMES" }
+        require(override !is Override.Sequence) { "A sequence step can't be another sequence" }
+    }
+
+    public companion object {
+        public const val MAX_TIMES: Int = 1000
+    }
+}
+
+/** 조작만 있으면 times 1인 단계로, `times`·`override`가 있으면 묶음으로 읽는다. times 1이면 조작만 쓴다. */
+internal object SequenceStepSerializer : KSerializer<SequenceStep> {
+    @Serializable
+    private class Repeated(val times: Int, val override: Override)
+
+    override val descriptor: SerialDescriptor = Repeated.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: SequenceStep) {
+        val json = encoder as? JsonEncoder ?: throw SerializationException("SequenceStep needs JSON")
+        if (value.times == 1) {
+            json.encodeSerializableValue(Override.serializer(), value.override)
+        } else {
+            json.encodeSerializableValue(Repeated.serializer(), Repeated(value.times, value.override))
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): SequenceStep {
+        val json = decoder as? JsonDecoder ?: throw SerializationException("SequenceStep needs JSON")
+        val element = json.decodeJsonElement()
+        val isRepeated = element is JsonObject && "type" !in element && "override" in element
+        return if (isRepeated) {
+            val repeated = json.json.decodeFromJsonElement(Repeated.serializer(), element)
+            SequenceStep(repeated.override, repeated.times)
+        } else {
+            SequenceStep(json.json.decodeFromJsonElement(Override.serializer(), element))
         }
     }
 }

@@ -218,8 +218,14 @@ class BoggartMcpTest {
         assertEquals(JsonPatchOp.serializer().descriptor.fields(), op.properties().keys)
 
         val sequence = overrides.getValue("sequence").properties()
-        val steps = sequence.getValue("steps").jsonObject.getValue("items").jsonObject.variants()
-        assertEquals(overrideClasses.keys - "sequence", steps.keys)
+        // 단계는 조작(type으로 구분) 또는 type 없는 {times, override} 묶음이다.
+        val stepItems = sequence.getValue("steps").jsonObject.getValue("items").jsonObject.getValue("oneOf").jsonArray.map { it.jsonObject.resolve() }
+        val (typed, repeated) = stepItems.partition { "type" in it.properties() }
+        assertEquals(overrideClasses.keys - "sequence", typed.map { it.properties().getValue("type").jsonObject.getValue("const").jsonPrimitive.content }.toSet())
+        assertEquals(setOf("times", "override"), repeated.single().properties().keys)
+        assertEquals(overrideClasses.keys - "sequence", repeated.single().properties().getValue("override").jsonObject.variants().keys)
+        // chance 안에는 sequence·chance를 넣을 수 없다.
+        assertEquals(overrideClasses.keys - "sequence" - "chance", overrides.getValue("chance").properties().getValue("override").jsonObject.variants().keys)
         val ends = SequenceEnd.serializer().descriptor.elementNames.toSet()
         assertEquals(ends, sequence.getValue("then").jsonObject.getValue("enum").jsonArray.map { it.jsonPrimitive.content }.toSet())
     }

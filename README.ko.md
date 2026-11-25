@@ -159,6 +159,7 @@ debug 빌드를 실행하고 요청을 보내면 앱 위에 작은 버블이 떠
 | 네트워크 없음 | 모드 → 오프라인 |
 | 느린 응답 | 어떤 규칙에든 지연을 붙임 |
 | 실패 뒤 재시도 | [순차 응답](#순차-응답-차례로-다른-응답-보내기) 규칙: 500, 그다음 실제 응답 |
+| 가끔 나는 실패 | [확률](#가끔-실패시키기) 규칙(예: 30% 타임아웃) |
 
 [샘플 앱](#샘플-앱)에는 이 중 대부분이 프리셋으로 들어 있습니다.
 
@@ -218,13 +219,14 @@ src/debug/assets/boggart/bodies/user-404.json
 | `matcher.path` | 경로 글롭. `*`는 한 세그먼트, `**`는 0개 이상. 끝 슬래시는 구분하지 않습니다 |
 | `matcher.method` / `host` | 대소문자 무시. 비우면 모두 매칭 |
 | `matcher.query` / `headers` | `{"이름": "값"}`. 값이 `*`이면 존재만 검사 |
-| `override.type` | `jsonPatch`(빠른 편집) / `patch`(직접 편집) / `replace`(응답 돌려주기) / `fail`(네트워크 에러) / `sequence`(순차 응답, [순차 응답](#순차-응답-차례로-다른-응답-보내기) 참고) |
+| `override.type` | `jsonPatch`(빠른 편집) / `patch`(직접 편집) / `replace`(응답 돌려주기) / `fail`(네트워크 에러) / `sequence`(순차 응답, [순차 응답](#순차-응답-차례로-다른-응답-보내기) 참고) / `chance`(일부 호출만, [가끔 실패시키기](#가끔-실패시키기) 참고) |
 | `override.ops` (`jsonPatch`) | `{"op": "add" \| "remove" \| "replace", "path": "/0/title", "value": …}` 배열(JSON Patch, RFC 6902). 경로는 JSON Pointer(RFC 6901). 하나라도 적용할 수 없으면 패치 전체를 버리고 원본을 전달합니다 |
 | `override.patch` (`patch`) | 바꿀 필드만 적습니다(JSON Merge Patch, RFC 7396). 값이 `null`이면 그 필드를 지우고, 배열은 통째로 교체합니다 |
 | `override.status` / `headers` / `body` / `bodyFile` (`replace`) | 돌려줄 응답. `bodyFile`은 `bodies/` 아래 파일명이고 `body`와 함께 쓸 수 없습니다 |
 | `override.kind.type` (`fail`) | `timeout` / `connectionReset` / `unknownHost` / `custom`(`message`) |
 | `override.delayMs` | 어떤 규칙에나 붙일 수 있는 지연. `sequence`는 단계마다 따로 둡니다 |
-| `override.steps` / `then` (`sequence`) | 차례대로 적용할 단계와, 마지막 단계 뒤 동작: `last` / `loop` / `original` |
+| `override.steps` / `then` (`sequence`) | 차례대로 적용할 단계와, 마지막 단계 뒤 동작: `last` / `loop` / `original`. 단계는 조작 하나, 또는 여러 번 이어 쓸 때 `{"times": 3, "override": …}` |
+| `override.percent` / `override` (`chance`) | 확률(1~99%)과, 걸렸을 때 적용할 조작 |
 
 `"enabled": true`인 프리셋은 그 빌드를 설치한 모두에게 처음부터 켜지므로, `false`로 두고 앱에서 켜기를 권장합니다. 켜고 끈 상태는 기억됩니다.
 
@@ -251,12 +253,24 @@ src/debug/assets/boggart/bodies/user-404.json
 }
 ```
 
-- **단계.** 단계마다 다른 조작(`replace`, `patch`, `jsonPatch`, `fail`)을 하나씩 쓰고, 지연(`delayMs`)도 단계마다 따로 둡니다. 같은 응답을 여러 번 보내려면 그 단계를 여러 번 적습니다.
+- **단계.** 단계마다 다른 조작(`replace`, `patch`, `jsonPatch`, `fail`, `chance`)을 하나씩 쓰고, 지연(`delayMs`)도 단계마다 따로 둡니다. 한 단계를 여러 호출에 이어 쓰려면 `{ "times": 3, "override": { "type": "replace", "status": 500 } }`처럼 감쌉니다(1~1000). 예를 들어 500 세 번에 `"then": "original"`을 주면 처음 세 호출만 실패합니다.
 - **마지막 단계 뒤.** `then`은 `last`(기본값, 마지막 단계를 계속 보냄), `loop`(처음부터 다시), `original`(실제 서버로 보냄) 중 하나입니다. 오프라인 모드에서 `original`은 규칙이 없는 호출처럼 실패합니다.
 - **세는 기준.** 앱이 응답을 어떻게 처리했는지와 상관없이, 규칙에 맞은 호출마다 한 단계씩 나아갑니다. 규칙 일시정지·끔 모드의 호출은 세지 않습니다.
 - **처음부터 다시.** 진행 위치는 메모리에만 있습니다. 앱을 다시 시작할 때, 규칙을 고치거나 껐다 켤 때, 규칙 편집 화면에서 **처음으로 되돌리기**를 누를 때, `riddikulus`·`POST /reset`을 부르거나 원격 제어로 규칙을 다시 넣을 때 처음부터 시작합니다.
 - **규칙 하나에 위치 하나.** `/users/*`처럼 넓은 경로를 쓰면 맞는 호출이 모두 같은 위치를 나눠 씁니다.
 - **화면에서.** 규칙 목록에 다음 차례가, 호출 상세에 그 호출이 받은 차례가 나옵니다(원격 제어에서는 0부터 세는 `step`). 규칙 편집 화면은 단계 목록과 마지막 단계 뒤 동작을 보여 주지만, 단계 자체는 `rules.json`이나 원격 제어로 바꿉니다.
+
+### 가끔 실패시키기
+
+`chance` 조작은 무작위로 고른 일부 호출에만 안의 조작을 적용하고, 나머지는 실제 서버로 보냅니다. 불안정한 네트워크에서 앱이 어떻게 버티는지 볼 때 씁니다.
+
+```json
+"override": { "type": "chance", "percent": 30, "override": { "type": "fail", "kind": { "type": "timeout" } } }
+```
+
+- `percent`는 1~99입니다. 안의 조작은 `sequence`와 `chance`를 뺀 무엇이든 됩니다.
+- 걸리지 않고 실제 서버로 간 호출은 원본으로 기록되지만 규칙 이름이 함께 남아, 규칙이 없는 호출과 구분됩니다.
+- `chance`는 순차 응답의 단계로도 쓸 수 있습니다.
 
 ## 명령줄로 제어하기
 

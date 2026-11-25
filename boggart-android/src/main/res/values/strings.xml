@@ -198,6 +198,11 @@
     <string name="boggart_sequence_restart">Reset to the first</string>
     <string name="boggart_sequence_restarted">The next call gets the first response</string>
     <string name="boggart_sequence_readonly">Change the responses in rules.json or with remote control.</string>
+    <string name="boggart_override_chance">Chance · %1$d%%</string>
+    <string name="boggart_desc_chance">%1$d%% of calls: %2$s</string>
+    <string name="boggart_sequence_times">%1$s ×%2$d</string>
+    <string name="boggart_chance_skipped">Let through by: %1$s</string>
+    <string name="boggart_chance_readonly">Change the chance and the override in rules.json or with remote control.</string>
     <string name="boggart_sequence_call_step">Response %1$d of %2$d in the sequence</string>
 
     <!-- 호출 상태 (배지 네 가지와 상세 설명) -->

@@ -1,6 +1,8 @@
 package io.github.hyunchan.boggart.android.ui.calldetail
+import io.github.hyunchan.boggart.FailKind
 import io.github.hyunchan.boggart.JsonPatchOp
 import io.github.hyunchan.boggart.Override
+import io.github.hyunchan.boggart.SequenceStep
 import io.github.hyunchan.boggart.android.R
 import io.github.hyunchan.boggart.android.ui.common.FakeBoggartStore
 import io.github.hyunchan.boggart.android.ui.common.MainDispatcherExtension
@@ -141,14 +143,26 @@ class CallDetailViewModelTest {
 
     @Test
     fun `a call answered by a sequence starts from its step and offers to switch`() = runTest {
-        val sequence = Override.Sequence(listOf(Override.Replace(status = 500), Override.JsonPatch(listOf(replace("/0/title", "x")))))
+        val sequence = Override.Sequence(listOf(SequenceStep(Override.Replace(status = 500)), SequenceStep(Override.JsonPatch(listOf(replace("/0/title", "x"))))))
         val store = FakeBoggartStore(listOf(jsonExchange(appliedRuleId = "seq").copy(step = 1)))
         store.upsert(RuleTarget.Temporary("seq"), rule("seq", sequence))
         val state = CallDetailViewModel(1, store).state.value
         assertEquals(Action.Values, state.action)
         assertEquals(listOf(replace("/0/title", "x")), state.ops)
-        assertTrue(state.targetIsSequence)
+        assertTrue(state.targetIsComposite)
         assertEquals(2, state.appliedSequenceSize)
         assertEquals(R.string.boggart_switch_to_values, state.submitButton)
+    }
+
+    @Test
+    fun `a call let through by a chance rule starts from its override and offers to switch`() = runTest {
+        val chance = Override.Chance(30, Override.Fail(FailKind.Timeout))
+        val store = FakeBoggartStore(listOf(jsonExchange(appliedRuleId = "c")))
+        store.upsert(RuleTarget.Temporary("c"), rule("c", chance))
+        val state = CallDetailViewModel(1, store).state.value
+        assertEquals(Action.Respond, state.action)
+        assertEquals(RespondKind.Error, state.editor.respondKind)
+        assertTrue(state.targetIsComposite)
+        assertEquals(R.string.boggart_switch_to_error, state.submitButton)
     }
 }

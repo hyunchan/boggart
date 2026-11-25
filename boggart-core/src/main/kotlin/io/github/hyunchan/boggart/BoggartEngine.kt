@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonElement
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.random.Random
 
 /**
  * [BoggartEngine.beforeRequest]의 결정. 지연은 엔진이 아니라 어댑터가 자기 스레딩 모델에 맞게 수행한다.
@@ -63,7 +64,11 @@ public sealed interface Decision {
     ) : Decision
 }
 
-/** [Override.Sequence] 규칙의 진행 위치. [rule]과 같은 인스턴스일 때만 유효하다. */
+/**
+ * [Override.Sequence] 규칙의 진행 위치. [rule]과 같은 인스턴스일 때만 유효하다.
+ *
+ * @property next 지금까지 쓴 호출 수(다음 호출의 번호). 단계 번호는 [BoggartEngine.nextStep]으로 읽는다.
+ */
 public data class SequenceCursor(val rule: Rule, val next: Int)
 
 /**
@@ -81,6 +86,8 @@ public class BoggartEngine(
     @Volatile public var onInvalidPatch: OnInvalidPatch = OnInvalidPatch.Ignore,
     @Volatile public var bodyFileResolver: BodyFileResolver? = null,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** [Override.Chance]의 확률 판정에 쓴다. 테스트는 결과가 정해진 것을 넣는다. */
+    private val random: Random = Random.Default,
 ) {
     /**
      * 요청이 규칙 로딩을 기다렸을 때 불린다(기다린 ms, 시간 안에 준비되었는지). 이미 준비된 뒤의 요청에는 불리지 않는다.
@@ -130,16 +137,22 @@ public class BoggartEngine(
                 if (mode != Mode.Offline) return Decision.Proceed(startedAtMs = startedAt)
                 return Decision.Fail(FailKind.UnknownHost, null, startedAtMs = startedAt)
             }
-            else -> sequence.steps[step]
+            else -> sequence.steps[step].override
         }
-        return when (override) {
+        val applied = when (override) {
+            // 확률에 걸리지 않으면 조작 없이 실제 서버로 보내되, 기록에는 이 규칙이 판정했다는 것을 남긴다.
+            is Override.Chance -> if (random.nextInt(PERCENT) < override.percent) override.override else null
+            else -> override
+        }
+        return when (applied) {
+            null -> Decision.Proceed(rule, 0, null, step, startedAt)
             is Override.Replace -> {
-                val response = buildReplacement(override) ?: return Decision.Proceed(rule, override.delayMs, override, step, startedAt)
-                Decision.Respond(response, Provenance.Replaced, rule, override.delayMs, step, startedAt)
+                val response = buildReplacement(applied) ?: return Decision.Proceed(rule, applied.delayMs, applied, step, startedAt)
+                Decision.Respond(response, Provenance.Replaced, rule, applied.delayMs, step, startedAt)
             }
-            is Override.Patch, is Override.JsonPatch -> Decision.Proceed(rule, override.delayMs, override, step, startedAt)
-            is Override.Fail -> Decision.Fail(override.kind, rule, override.delayMs, step, startedAt)
-            is Override.Sequence -> error("A sequence step can't be another sequence")
+            is Override.Patch, is Override.JsonPatch -> Decision.Proceed(rule, applied.delayMs, applied, step, startedAt)
+            is Override.Fail -> Decision.Fail(applied.kind, rule, applied.delayMs, step, startedAt)
+            is Override.Sequence, is Override.Chance -> error("A step or chance can't hold a sequence or another chance")
         }
     }
 
@@ -151,6 +164,12 @@ public class BoggartEngine(
      * 내용 그대로 다시 넣고 처음부터 시작하려면 [resetSequence]를 부른다.
      */
     public fun nextStep(rule: Rule): Int {
+        val sequence = rule.override as? Override.Sequence ?: return 0
+        return sequence.stepAt(nextCall(rule)) ?: sequence.steps.size
+    }
+
+    /** [rule]이 지금까지 쓴 호출 수(다음 호출의 번호). 규칙이 바뀌었으면 0. */
+    private fun nextCall(rule: Rule): Int {
         val cursor = cursors.value[rule.id] ?: return 0
         return if (cursor.rule === rule) cursor.next else 0
     }
@@ -167,18 +186,14 @@ public class BoggartEngine(
 
     /** 이번 호출에 쓸 단계를 고르고 커서를 한 칸 옮긴다. then = original로 다 썼으면 null. */
     private fun advance(rule: Rule, sequence: Override.Sequence): Int? = synchronized(cursorLock) {
-        val size = sequence.steps.size
-        val current = nextStep(rule)
+        val calls = sequence.calls
+        val current = nextCall(rule)
         val next = when (sequence.then) {
-            SequenceEnd.Loop -> (current + 1) % size
-            SequenceEnd.Last, SequenceEnd.Original -> minOf(current + 1, size)
+            SequenceEnd.Loop -> (current + 1) % calls
+            SequenceEnd.Last, SequenceEnd.Original -> minOf(current + 1, calls)
         }
         cursors.value += rule.id to SequenceCursor(rule, next)
-        when {
-            current < size -> current
-            sequence.then == SequenceEnd.Last -> size - 1
-            else -> null
-        }
+        sequence.stepAt(current) ?: if (sequence.then == SequenceEnd.Last) sequence.steps.lastIndex else null
     }
 
     /** 앱 시작 직후 아직 읽지 못한 규칙(프리셋·저장 규칙)을 놓치지 않도록 최대 [RULES_READY_TIMEOUT_MS] 기다린다. */
@@ -204,13 +219,14 @@ public class BoggartEngine(
         val override = decision.override
         val step = decision.step
         if (rule == null || override == null) {
-            record(request, response, response, Provenance.Original, null, startedAt = decision.startedAtMs)
+            // 규칙이 있는데 조작이 없으면 확률에 걸리지 않은 호출이다. 판정한 규칙을 남긴다.
+            record(request, response, response, Provenance.Original, rule?.id, step = step, startedAt = decision.startedAtMs)
             return response
         }
         val (patchedBody, ruleOnInvalid) = when (override) {
             is Override.Patch -> applyPatch(response.body) { JsonMergePatch.apply(it, override.patch) } to override.onInvalid
             is Override.JsonPatch -> applyPatch(response.body) { JsonPatch.apply(it, override.ops) } to override.onInvalid
-            is Override.Replace, is Override.Fail, is Override.Sequence -> {
+            is Override.Replace, is Override.Fail, is Override.Sequence, is Override.Chance -> {
                 record(request, response, response, Provenance.InvalidIgnored, rule.id, step = step, startedAt = decision.startedAtMs)
                 return response
             }
@@ -312,6 +328,7 @@ public class BoggartEngine(
 
     private companion object {
         const val CONTENT_LENGTH = "Content-Length"
+        const val PERCENT = 100
 
         /** 오프라인 모드에서 규칙이 없어 막은 호출의 교환 기록 문구. */
         const val OFFLINE_ERROR = "Offline mode: no rule for this call"

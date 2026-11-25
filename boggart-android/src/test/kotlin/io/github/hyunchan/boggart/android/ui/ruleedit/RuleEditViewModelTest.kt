@@ -2,6 +2,7 @@ package io.github.hyunchan.boggart.android.ui.ruleedit
 import io.github.hyunchan.boggart.FailKind
 import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.SequenceEnd
+import io.github.hyunchan.boggart.SequenceStep
 import io.github.hyunchan.boggart.android.R
 import io.github.hyunchan.boggart.android.ui.common.FakeBoggartStore
 import io.github.hyunchan.boggart.android.ui.common.MainDispatcherExtension
@@ -69,7 +70,7 @@ class RuleEditViewModelTest {
     @Test
     fun `a sequence rule keeps its steps and changes only what happens after the last`() = runTest {
         val store = FakeBoggartStore()
-        val steps = listOf(Override.Replace(status = 500), Override.Replace(status = 200))
+        val steps = listOf(SequenceStep(Override.Replace(status = 500), times = 2), SequenceStep(Override.Replace(status = 200)))
         store.upsert(RuleTarget.Temporary("t"), rule("t", Override.Sequence(steps)))
         store.progressState.value = mapOf("t" to 1)
         val vm = RuleEditViewModel("t", store)
@@ -85,7 +86,7 @@ class RuleEditViewModelTest {
     @Test
     fun `restarting a sequence starts it from the first step`() = runTest {
         val store = FakeBoggartStore()
-        store.upsert(RuleTarget.Temporary("t"), rule("t", Override.Sequence(listOf(Override.Replace(status = 500)))))
+        store.upsert(RuleTarget.Temporary("t"), rule("t", Override.Sequence(listOf(SequenceStep(Override.Replace(status = 500))))))
         store.progressState.value = mapOf("t" to 1)
         val vm = RuleEditViewModel("t", store)
         vm.onIntent(RuleEditIntent.RestartSequence)

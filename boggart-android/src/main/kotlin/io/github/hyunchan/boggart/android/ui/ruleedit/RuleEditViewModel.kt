@@ -193,6 +193,8 @@ internal class RuleEditViewModel(private val ruleId: String, private val store: 
             }
             // 단계는 화면에서 고치지 않는다(rules.json·원격 제어). 조건과 마지막 뒤 동작만 바꾼다.
             is Override.Sequence -> Draft.Ok(base.copy(override = override.copy(then = f.then)))
+            // 확률과 안의 조작은 화면에서 고치지 않는다. 조건만 바꾼다.
+            is Override.Chance -> Draft.Ok(base.copy(override = override))
         }
     }
 }

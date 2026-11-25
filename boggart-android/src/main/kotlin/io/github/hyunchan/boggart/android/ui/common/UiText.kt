@@ -10,6 +10,7 @@ import io.github.hyunchan.boggart.Override
 import io.github.hyunchan.boggart.Provenance
 import io.github.hyunchan.boggart.Rule
 import io.github.hyunchan.boggart.SequenceEnd
+import io.github.hyunchan.boggart.SequenceStep
 import io.github.hyunchan.boggart.android.R
 
 /** 화면 문구를 리소스에서 고르는 곳. 순수 함수는 enum만 돌려주고 언어별 문구는 여기서 정한다. */
@@ -65,7 +66,15 @@ internal fun overrideLabel(override: Override): String = when (override) {
     is Override.JsonPatch -> pluralStringResource(R.plurals.boggart_override_values, override.ops.size, override.ops.size)
     is Override.Fail -> stringResource(R.string.boggart_override_fail, failKindLabel(override.kind))
     is Override.Sequence -> pluralStringResource(R.plurals.boggart_override_sequence, override.steps.size, override.steps.size)
+    is Override.Chance -> stringResource(R.string.boggart_override_chance, override.percent)
 } + if (override.delayMs > 0) " +${override.delayMs}ms" else ""
+
+/** 순차 응답 단계 한 줄. 여러 번 쓰는 단계면 횟수를 덧붙인다. */
+@Composable
+internal fun stepSentence(step: SequenceStep): String {
+    val sentence = overrideSentence(step.override)
+    return if (step.times > 1) stringResource(R.string.boggart_sequence_times, sentence, step.times) else sentence
+}
 
 @Composable
 internal fun SequenceEnd.label(): String = stringResource(
@@ -135,6 +144,7 @@ internal fun overrideSentence(override: Override, nextStep: Int? = null): String
                 else -> count + " · " + stringResource(R.string.boggart_sequence_used_up)
             }
         }
+        is Override.Chance -> stringResource(R.string.boggart_desc_chance, override.percent, overrideSentence(override.override))
     }
     return if (override.delayMs > 0) main + " · " + stringResource(R.string.boggart_desc_delay, override.delayMs) else main
 }

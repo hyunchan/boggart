@@ -159,6 +159,7 @@ Rules come from three places.
 | No network | Mode → Offline |
 | A slow response | Any rule, with a delay |
 | A retry after a failure | A [sequence](#sequences-responses-in-turn) rule: 500, then the real response |
+| Failures now and then | A [chance](#failing-some-of-the-time) rule, e.g. 30% timeouts |
 
 The [sample app](#sample-app) ships a preset for most of these.
 
@@ -218,13 +219,14 @@ src/debug/assets/boggart/bodies/user-404.json
 | `matcher.path` | Path glob. `*` matches one segment, `**` zero or more. A trailing slash doesn't matter |
 | `matcher.method` / `host` | Case-insensitive. Leave out to match any |
 | `matcher.query` / `headers` | `{"name": "value"}`. A value of `*` only checks that it's present |
-| `override.type` | `jsonPatch` (quick edit) / `patch` (manual edit) / `replace` (return a response) / `fail` (network error) / `sequence` (responses in turn, see [Sequences](#sequences-responses-in-turn)) |
+| `override.type` | `jsonPatch` (quick edit) / `patch` (manual edit) / `replace` (return a response) / `fail` (network error) / `sequence` (responses in turn, see [Sequences](#sequences-responses-in-turn)) / `chance` (some calls only, see [Failing some of the time](#failing-some-of-the-time)) |
 | `override.ops` (`jsonPatch`) | Array of `{"op": "add" \| "remove" \| "replace", "path": "/0/title", "value": …}` (JSON Patch, RFC 6902). Paths are JSON Pointers (RFC 6901). If any op can't be applied, the whole patch is dropped and the original is delivered |
 | `override.patch` (`patch`) | The fields to change (JSON Merge Patch, RFC 7396). A `null` value removes the field; arrays are replaced whole |
 | `override.status` / `headers` / `body` / `bodyFile` (`replace`) | The response to return. `bodyFile` is a file name under `bodies/` and can't be combined with `body` |
 | `override.kind.type` (`fail`) | `timeout` / `connectionReset` / `unknownHost` / `custom` (with `message`) |
 | `override.delayMs` | Optional delay for any override. In a `sequence`, each step has its own |
-| `override.steps` / `then` (`sequence`) | The steps in order, and what happens after the last one: `last` / `loop` / `original` |
+| `override.steps` / `then` (`sequence`) | The steps in order, and what happens after the last one: `last` / `loop` / `original`. A step is an override, or `{"times": 3, "override": …}` to use it several calls in a row |
+| `override.percent` / `override` (`chance`) | Chance in percent (1–99), and the override to apply when it hits |
 
 A preset with `"enabled": true` is on for everyone who installs the build, so keep presets at `false` and switch them on in the app. Boggart remembers which ones you switched on.
 
@@ -251,12 +253,24 @@ A `sequence` override answers successive matching calls with its steps in turn: 
 }
 ```
 
-- **Steps.** Each step is any other override (`replace`, `patch`, `jsonPatch` or `fail`) with its own `delayMs`. To send a response more than once, list it again.
+- **Steps.** Each step is any other override (`replace`, `patch`, `jsonPatch`, `fail` or `chance`) with its own `delayMs`. To use a step several calls in a row, wrap it: `{ "times": 3, "override": { "type": "replace", "status": 500 } }` (1–1000). For example, three 500s then `"then": "original"` makes only the first three calls fail.
 - **After the last step.** `then` is `last` (default, keep sending the last step), `loop` (start again from the first) or `original` (let calls reach the server). In offline mode, `original` fails like a call without a rule.
 - **What counts.** Every call the rule matches moves it on, whatever the app does with the response. Calls in paused or off mode don't count.
 - **Starting over.** The position is kept in memory. It starts over when the app restarts, when the rule is changed or switched off and on, when you tap **Reset to the first** in the rule editor, and on `riddikulus`, `POST /reset` or putting the rule again over remote control.
 - **One position per rule.** With a broad path such as `/users/*`, all matching calls share it.
 - **In the app.** The rule list shows which response is next, and a call shows which response it got (`step` in remote control, counted from 0). The rule editor shows the steps and what happens after the last one, but the steps themselves are changed in `rules.json` or over remote control.
+
+### Failing some of the time
+
+A `chance` override applies its override to some calls only, picked at random, and lets the rest reach the server. Use it to see how the app copes with a flaky network.
+
+```json
+"override": { "type": "chance", "percent": 30, "override": { "type": "fail", "kind": { "type": "timeout" } } }
+```
+
+- `percent` is 1–99. The inner override can be anything except `sequence` and `chance`.
+- Calls it lets through are captured as original and still show the rule, so you can tell them from calls no rule matched.
+- A `chance` can also be a step in a sequence.
 
 ## Controlling Boggart from the command line
 

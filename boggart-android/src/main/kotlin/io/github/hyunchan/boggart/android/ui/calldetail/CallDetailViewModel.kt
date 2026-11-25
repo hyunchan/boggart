@@ -95,8 +95,8 @@ internal data class CallDetailState(
     val targetKind: RuleKind?,
     /** 규칙으로 만들지 않은 수정이 있는지. 나가기 전에 묻는다. */
     val dirty: Boolean,
-    /** 고칠 기존 규칙이 순차 응답인지. 만들면 단계 목록이 한 가지 조작으로 바뀐다. */
-    val targetIsSequence: Boolean = false,
+    /** 고칠 기존 규칙이 순차 응답·확률 조작인지. 만들면 한 가지 조작으로 바뀐다. */
+    val targetIsComposite: Boolean = false,
     /** 이 호출에 순차 응답 규칙이 적용됐으면 그 규칙의 단계 수. 단계 번호는 [Exchange.step]에 있다. */
     val appliedSequenceSize: Int? = null,
 ) {
@@ -106,7 +106,7 @@ internal data class CallDetailState(
      */
     @get:StringRes
     val submitButton: Int get() = when {
-        targetIsSequence -> kind.switchTo
+        targetIsComposite -> kind.switchTo
         else -> when (targetKind) {
             null -> kind.button
             kind -> R.string.boggart_update_rule
@@ -165,7 +165,7 @@ private data class Form(
             updating = rules.isEditable(targetRuleId),
             targetKind = target?.let { kindOf(it) },
             dirty = ops != savedOps || editor.contentDiffers(savedEditor),
-            targetIsSequence = target is Override.Sequence,
+            targetIsComposite = target is Override.Sequence || target is Override.Chance,
             appliedSequenceSize = (applied as? Override.Sequence)?.steps?.size?.takeIf { exchange?.step != null },
         )
     }
@@ -177,10 +177,9 @@ private data class Form(
             // 이미 만든 임시·저장 규칙을 이어서 고친다. 같은 호출에 규칙이 겹겹이 생기지 않게 한다.
             val existing = appliedId?.takeIf(rules::isEditable)?.let { rules.find(it)?.second }
                 ?: exchange?.let { rules.editableMatching(RuleDrafts.matcherFor(it.request)) }
-            // 순차 응답이면 이 호출에 쓰인 단계에서 시작한다.
+            // 순차 응답이면 이 호출에 쓰인 단계에서, 확률 조작이면 그 안의 조작에서 시작한다.
             val applied = (existing ?: rules.find(appliedId)?.second)?.let { rule ->
-                val sequence = rule.override as? Override.Sequence ?: return@let rule
-                sequence.steps.getOrNull(exchange?.step ?: -1)?.let { rule.copy(override = it) }
+                startingOverride(rule.override, exchange?.step)?.let { rule.copy(override = it) }
             }
             val ops = ValueEdits.initialOps(applied)
             val appliedKind = applied?.override?.let { kindOf(it) }
@@ -202,13 +201,19 @@ private data class Form(
     }
 }
 
-/** 순차 응답은 한 가지 종류로 나타낼 수 없으므로 null. */
+/** 호출 상세가 편집을 시작할 조작. 순차 응답은 [step] 단계(없으면 null), 확률 조작은 그 안의 조작. */
+private fun startingOverride(override: Override, step: Int?): Override? {
+    val chosen = if (override is Override.Sequence) override.steps.getOrNull(step ?: -1)?.override ?: return null else override
+    return (chosen as? Override.Chance)?.override ?: chosen
+}
+
+/** 순차 응답·확률 조작은 한 가지 종류로 나타낼 수 없으므로 null. */
 private fun kindOf(override: Override): RuleKind? = when (override) {
     is Override.JsonPatch -> RuleKind.Values
     is Override.Patch -> RuleKind.Manual
     is Override.Replace -> RuleKind.Response
     is Override.Fail -> RuleKind.Error
-    is Override.Sequence -> null
+    is Override.Sequence, is Override.Chance -> null
 }
 
 private fun serverJsonOf(exchange: Exchange?): JsonElement? = exchange?.originalResponse?.body?.let(RuleDrafts::parseJson)

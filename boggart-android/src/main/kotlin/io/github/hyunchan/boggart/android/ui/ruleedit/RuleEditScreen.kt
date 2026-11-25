@@ -61,6 +61,7 @@ import io.github.hyunchan.boggart.android.ui.common.label
 import io.github.hyunchan.boggart.android.ui.common.matcherLabel
 import io.github.hyunchan.boggart.android.ui.common.overrideLabel
 import io.github.hyunchan.boggart.android.ui.common.overrideSentence
+import io.github.hyunchan.boggart.android.ui.common.stepSentence
 import io.github.hyunchan.boggart.android.ui.common.storeViewModel
 
 /** 규칙 편집 화면. ViewModel을 만들고 상태 구독과 효과 처리만 맡는다. 그리기는 [RuleEditContent]가 한다. */
@@ -195,9 +196,13 @@ private fun ColumnScope.RuleFormFields(
             Text(stringResource(R.string.boggart_sequence_then), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
             ChoiceRow(SequenceEnd.entries, form.then, { it.label() }) { edit(form.copy(then = it)) }
         }
+        is Override.Chance -> {
+            Text(overrideSentence(override), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.boggart_chance_readonly), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+        }
     }
-    // 순차 응답은 단계마다 지연을 따로 둔다.
-    if (override !is Override.Sequence) DelayPicker(form.delay) { edit(form.copy(delay = it)) }
+    // 순차 응답은 단계마다, 확률 조작은 안의 조작이 지연을 따로 둔다.
+    if (override !is Override.Sequence && override !is Override.Chance) DelayPicker(form.delay) { edit(form.copy(delay = it)) }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -225,7 +230,7 @@ private fun ColumnScope.SequenceSteps(sequence: Override.Sequence, nextStep: Int
     sequence.steps.forEachIndexed { index, step ->
         val isNext = index == nextStep
         Text(
-            stringResource(R.string.boggart_sequence_step, index + 1, overrideSentence(step)) +
+            stringResource(R.string.boggart_sequence_step, index + 1, stepSentence(step)) +
                 if (isNext) " · " + stringResource(R.string.boggart_sequence_next_marker) else "",
             style = MaterialTheme.typography.bodyMedium,
             color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,

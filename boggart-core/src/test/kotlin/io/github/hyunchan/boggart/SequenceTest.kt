@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SequenceTest {
     private val temporary = TemporaryRuleSource()
@@ -23,8 +24,13 @@ class SequenceTest {
 
     private fun status(code: Int) = Override.Replace(status = code)
 
+    private fun steps(vararg overrides: Override) = overrides.map(::SequenceStep)
+
     private fun addSequence(vararg steps: Override, then: SequenceEnd = SequenceEnd.Last, id: String = "seq"): Rule =
-        Rule(id, matcher = RequestMatcher(path = "/users/*"), override = Override.Sequence(steps.toList(), then)).also(temporary::add)
+        addSteps(steps(*steps), then, id)
+
+    private fun addSteps(steps: List<SequenceStep>, then: SequenceEnd = SequenceEnd.Last, id: String = "seq"): Rule =
+        Rule(id, matcher = RequestMatcher(path = "/users/*"), override = Override.Sequence(steps, then)).also(temporary::add)
 
     /** 한 번 호출하고 앱이 받은 상태 코드를 돌려준다. 실패면 -1, 실제 서버면 0. */
     private suspend fun callOnce(): Int = when (val decision = engine.beforeRequest(request)) {
@@ -146,7 +152,9 @@ class SequenceTest {
     @Test
     fun `sequences need steps and can't nest`() {
         assertFailsWith<IllegalArgumentException> { Override.Sequence(emptyList()) }
-        assertFailsWith<IllegalArgumentException> { Override.Sequence(listOf(Override.Sequence(listOf(status(200))))) }
+        assertFailsWith<IllegalArgumentException> { SequenceStep(Override.Sequence(steps(status(200)))) }
+        assertFailsWith<IllegalArgumentException> { SequenceStep(status(200), times = 0) }
+        assertFailsWith<IllegalArgumentException> { SequenceStep(status(200), times = SequenceStep.MAX_TIMES + 1) }
     }
 
     @Test
@@ -157,10 +165,43 @@ class SequenceTest {
             ]}}]}
         """.trimIndent()
         val rule = RulesDocument.parse(text).rules.single()
-        assertEquals(Override.Sequence(listOf(status(500), Override.Fail(FailKind.Timeout, 100)), SequenceEnd.Loop), rule.override)
+        assertEquals(Override.Sequence(steps(status(500), Override.Fail(FailKind.Timeout, 100)), SequenceEnd.Loop), rule.override)
         assertEquals(rule, RulesDocument.parse(RulesDocument(rules = listOf(rule)).encode()).rules.single())
         assertFailsWith<IllegalArgumentException> {
             RulesDocument.parse("""{"rules":[{"id":"x","override":{"type":"sequence","steps":[]}}]}""")
         }
+    }
+
+    @Test
+    fun `a step with times is used that many calls in a row`() = runTest {
+        val rule = addSteps(listOf(SequenceStep(status(500), times = 3), SequenceStep(status(200))))
+        assertEquals(listOf(500, 500), calls(2))
+        assertEquals(0, engine.nextStep(rule))
+        assertEquals(listOf(500, 200, 200), calls(3))
+        assertEquals(listOf(0, 0, 0, 1, 1), log.exchanges.value.map { it.step })
+        assertEquals(2, engine.nextStep(rule))
+    }
+
+    @Test
+    fun `times works with loop and original`() = runTest {
+        addSteps(listOf(SequenceStep(status(500), times = 2), SequenceStep(status(200))), SequenceEnd.Loop)
+        assertEquals(listOf(500, 500, 200, 500, 500, 200), calls(6))
+        temporary.clear()
+        addSteps(listOf(SequenceStep(Override.Fail(FailKind.Timeout), times = 2)), SequenceEnd.Original, id = "limited")
+        assertEquals(listOf(-1, -1, 0, 0), calls(4))
+    }
+
+    @Test
+    fun `steps with times round-trip and single steps stay plain`() {
+        val text = """{"rules":[{"id":"r","override":{"type":"sequence","steps":[
+            {"times":3,"override":{"type":"replace","status":500}},
+            {"type":"replace","status":200}
+        ]}}]}"""
+        val rule = RulesDocument.parse(text).rules.single()
+        assertEquals(Override.Sequence(listOf(SequenceStep(status(500), 3), SequenceStep(status(200)))), rule.override)
+        val encoded = RulesDocument(rules = listOf(rule)).encode()
+        assertEquals(rule, RulesDocument.parse(encoded).rules.single())
+        assertTrue("\"times\": 3" in encoded, encoded)
+        assertEquals(1, Regex("\"times\"").findAll(encoded).count(), encoded)
     }
 }

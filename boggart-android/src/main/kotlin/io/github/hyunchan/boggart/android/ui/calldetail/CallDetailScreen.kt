@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.hyunchan.boggart.Exchange
 import io.github.hyunchan.boggart.FailKind
+import io.github.hyunchan.boggart.Provenance
 import io.github.hyunchan.boggart.android.R
 import io.github.hyunchan.boggart.android.ui.calllist.formatTime
 import io.github.hyunchan.boggart.android.ui.common.BackButton
@@ -290,7 +291,9 @@ private fun ColumnScope.CallNotes(
     val id = exchange.appliedRuleId
     if (id != null && appliedRuleName != null) {
         val name = appliedRuleName
-        AssistChip(onClick = { onOpenRule(id) }, label = { Text(stringResource(R.string.boggart_applied_rule, name), maxLines = 1, overflow = TextOverflow.Ellipsis) })
+        // 규칙이 있는데 원본이면 확률 조작에 걸리지 않고 실제 서버로 간 호출이다.
+        val label = if (exchange.provenance == Provenance.Original) R.string.boggart_chance_skipped else R.string.boggart_applied_rule
+        AssistChip(onClick = { onOpenRule(id) }, label = { Text(stringResource(label, name), maxLines = 1, overflow = TextOverflow.Ellipsis) })
     }
     val step = exchange.step
     if (step != null && sequenceSize != null) {

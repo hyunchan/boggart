@@ -183,6 +183,11 @@
     <string name="boggart_sequence_restart">처음으로 되돌리기</string>
     <string name="boggart_sequence_restarted">다음 호출부터 첫 응답을 보냅니다</string>
     <string name="boggart_sequence_readonly">응답 목록은 rules.json이나 원격 제어로 바꿀 수 있습니다.</string>
+    <string name="boggart_override_chance">확률 · %1$d%%</string>
+    <string name="boggart_desc_chance">호출의 %1$d%%: %2$s</string>
+    <string name="boggart_sequence_times">%1$s ×%2$d</string>
+    <string name="boggart_chance_skipped">확률에 걸리지 않음: %1$s</string>
+    <string name="boggart_chance_readonly">확률과 조작은 rules.json이나 원격 제어로 바꿀 수 있습니다.</string>
     <string name="boggart_sequence_call_step">순차 응답 %2$d개 중 %1$d번째</string>
 
     <!-- 호출 상태 (배지 네 가지와 상세 설명) -->

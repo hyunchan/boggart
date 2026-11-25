@@ -94,7 +94,7 @@ internal object RuleSchema {
      * 규칙 스키마가 `$ref`로 가리키는 정의. 도구 입력 스키마 루트의 `$defs`에 싣는다.
      * sequence를 뺀 조작은 바깥 조작과 sequence의 단계 양쪽에서 쓰이므로 한 번만 싣고 참조한다.
      */
-    val defs: Map<String, JsonObject> get() = singleVariants
+    val defs: Map<String, JsonObject> get() = singleVariants + (CHANCE to chance)
 
     /** sequence를 뺀 조작(구분자 → 스키마). sequence의 단계로도 쓴다. */
     private val singleVariants: Map<String, JsonObject> = listOf(
@@ -142,12 +142,55 @@ internal object RuleSchema {
         ),
     ).associateBy { it.getValue("properties").jsonObject.getValue("type").jsonObject.getValue("const").jsonPrimitive.content }
 
-    private val singleRefs: List<JsonObject> = singleVariants.keys.map { name -> buildJsonObject { put("\$ref", "#/\$defs/$name") } }
+    private val singleRefs: List<JsonObject> = singleVariants.keys.map(::ref)
+
+    private val chance = variant(
+        CHANCE,
+        "On each call, apply 'override' with the given chance; otherwise let the call reach the server unchanged. " +
+            "Calls it lets through are captured as original with this rule's id.",
+        mapOf(
+            "percent" to buildJsonObject {
+                put("type", "integer")
+                put("minimum", 1)
+                put("maximum", 99)
+                put("description", "Chance of applying 'override', in percent.")
+            },
+            "override" to buildJsonObject {
+                put("description", "What to do when the chance hits: any override except sequence and chance.")
+                putJsonArray("oneOf") { singleRefs.forEach(::add) }
+            },
+        ),
+        listOf("percent", "override"),
+    )
+
+    /** 단계에 쓸 수 있는 조작: 단일 조작과 chance. */
+    private fun stepOverrides(description: String) = buildJsonObject {
+        put("description", description)
+        putJsonArray("oneOf") {
+            singleRefs.forEach(::add)
+            add(ref(CHANCE))
+        }
+    }
+
+    private val repeatedStep = obj(
+        "A step used several calls in a row.",
+        mapOf(
+            "times" to buildJsonObject {
+                put("type", "integer")
+                put("minimum", 1)
+                put("maximum", 1000)
+                put("description", "How many calls in a row get this step.")
+            },
+            "override" to stepOverrides("The override for those calls: any except sequence."),
+        ),
+        required = listOf("times", "override"),
+    )
 
     private val override = buildJsonObject {
         put("description", "How to change the response. Pick one variant by 'type'.")
         putJsonArray("oneOf") {
             singleRefs.forEach(::add)
+            add(ref(CHANCE))
             add(
                 variant(
                     "sequence",
@@ -157,10 +200,18 @@ internal object RuleSchema {
                         "steps" to buildJsonObject {
                             put("type", "array")
                             put("minItems", 1)
-                            put("description", "Steps in order. Repeat a step to use it more than once. A step can't be another sequence.")
+                            put(
+                                "description",
+                                "Steps in order. A step is an override (used once) or {times, override} (used several calls in a row). " +
+                                    "A step can't be another sequence.",
+                            )
                             putJsonObject("items") {
-                                put("description", "One step: any override except sequence.")
-                                putJsonArray("oneOf") { singleRefs.forEach(::add) }
+                                put("description", "One step.")
+                                putJsonArray("oneOf") {
+                                    singleRefs.forEach(::add)
+                                    add(ref(CHANCE))
+                                    add(repeatedStep)
+                                }
                             }
                         },
                         "then" to enumOf(
@@ -189,6 +240,10 @@ internal object RuleSchema {
         if (required.isNotEmpty()) put("required", buildJsonArray { required.forEach { add(JsonPrimitive(it)) } })
         put("additionalProperties", false)
     }
+
+    private fun ref(name: String) = buildJsonObject { put("\$ref", "#/\$defs/$name") }
+
+    private const val CHANCE = "chance"
 
     private fun string(description: String) = typed("string", description)
 
