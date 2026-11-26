@@ -327,7 +327,7 @@ claude mcp add --transport http boggart http://localhost:8765/mcp
 
 Other clients that support Streamable HTTP servers take the same URL. The tools are `boggart_status`, `boggart_set_mode`, `boggart_reset`, `boggart_list_calls`, `boggart_get_call`, `boggart_wait_for_call`, `boggart_list_rules`, `boggart_put_rule`, `boggart_set_rule_enabled`, `boggart_delete_rule` and `boggart_import_rules`. The server keeps no session, so it keeps working after the app restarts as long as the forward is in place. Run `adb forward` again after reconnecting the device.
 
-**Choosing between curl and MCP.** Agents that can run shell commands (such as Claude Code) and test scripts can use every feature with the curl commands above. MCP is useful in clients without a shell, or when you want inputs checked against the rule schema. The tool definitions, rule schema included, come to about 17 KB, and depending on the client they may stay in the session's context throughout.
+**Choosing between curl and MCP.** Agents that can run shell commands (such as Claude Code) and test scripts can use every feature with the curl commands above. MCP is useful in clients without a shell, or when you want inputs checked against the rule schema. The tool definitions, rule schema included, come to about 20 KB, and depending on the client they may stay in the session's context throughout.
 
 ## Configuration
 
